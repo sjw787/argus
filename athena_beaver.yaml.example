@@ -1,0 +1,40 @@
+# AthenaBeaver Configuration
+# Copy this to athena_beaver.yaml (or ~/.athena_beaver.yaml) and customize.
+
+aws:
+  region: us-east-1
+  profile: null  # Use null for default credential chain, or specify a profile name
+
+naming_schemas:
+  default:
+    description: "Standard schema: <purpose>_<clientid>_<environment>"
+    pattern: "{purpose}_{client_id}_{environment}"
+    client_id_regex: '\d{6}|\d{9}'   # Matches 6-digit or 9-digit client IDs
+    workgroup_pattern: "{purpose}_{client_id}_{environment}"
+  
+  # Add more schemas for different projects:
+  # short_id:
+  #   description: "Short alpha-numeric client IDs"
+  #   pattern: "{client_id}_{purpose}"
+  #   client_id_regex: '[a-z]{3}\d{4}'
+  #   workgroup_pattern: "wg_{client_id}"
+
+active_schema: default
+
+workgroups:
+  output_locations:
+    # Map workgroup name -> S3 URI for query results
+    # "analytics_123456_prod": "s3://my-athena-results/123456/prod/"
+    # "analytics_123456_dev": "s3://my-athena-results/123456/dev/"
+
+defaults:
+  output_location: "s3://my-athena-results/default/"
+  max_results: 100
+  query_timeout_seconds: 300
+
+# locked_settings: List of UI setting keys that users cannot change.
+# Valid values: theme, sqlAutocomplete, sqlDiagnostics, showHistoryDefault,
+#               showInformationSchema, formatStyle, autoLimit
+# locked_settings:
+#   - autoLimit
+#   - formatStyle

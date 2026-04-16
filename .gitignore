@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+.eggs/
+*.so
+
+# Virtual environment
+venv/
+.venv/
+env/
+.env/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# App config (contains real AWS/S3 details — commit only .example)
+athena_beaver.yaml
+
+# Query result exports
+*.csv
+*.xlsx
+*.parquet
+
+# Logs / runtime
+*.log
+nohup.out
+/tmp/
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Node / frontend build artifacts (built output is served by FastAPI)
+frontend/node_modules/
+frontend/dist/
+
+# Frontend local env overrides
+frontend/.env.local
+frontend/.env.*.local
