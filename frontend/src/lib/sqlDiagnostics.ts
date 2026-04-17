@@ -3,7 +3,7 @@ import type * as Monaco from 'monaco-editor'
 
 const parser = new Parser()
 const OWNER = 'sql-diagnostics'
-let _debounceTimer: ReturnType<typeof setTimeout> | null = null
+const _debounceTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const _disposables = new Map<string, Monaco.IDisposable>()
 
 /**
@@ -105,8 +105,12 @@ export function registerSqlDiagnostics(
   lintSql(monaco, model)
 
   const disposable = model.onDidChangeContent(() => {
-    if (_debounceTimer) clearTimeout(_debounceTimer)
-    _debounceTimer = setTimeout(() => lintSql(monaco, model), 600)
+    const existing = _debounceTimers.get(modelId)
+    if (existing) clearTimeout(existing)
+    _debounceTimers.set(modelId, setTimeout(() => {
+      _debounceTimers.delete(modelId)
+      lintSql(monaco, model)
+    }, 600))
   })
 
   _disposables.set(modelId, disposable)
@@ -121,6 +125,8 @@ export function unregisterSqlDiagnostics(
   if (!model) return
   const modelId = model.id
 
+  const timer = _debounceTimers.get(modelId)
+  if (timer) { clearTimeout(timer); _debounceTimers.delete(modelId) }
   _disposables.get(modelId)?.dispose()
   _disposables.delete(modelId)
   monaco.editor.setModelMarkers(model, OWNER, [])
