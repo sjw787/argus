@@ -11,9 +11,10 @@ locals {
 }
 
 resource "aws_route53_record" "app_a" {
-  zone_id = local.hosted_zone_id
-  name    = var.domain_name
-  type    = "A"
+  zone_id         = local.hosted_zone_id
+  name            = var.domain_name
+  type            = "A"
+  allow_overwrite = true
 
   alias {
     name                   = aws_cloudfront_distribution.app.domain_name
@@ -23,9 +24,10 @@ resource "aws_route53_record" "app_a" {
 }
 
 resource "aws_route53_record" "app_aaaa" {
-  zone_id = local.hosted_zone_id
-  name    = var.domain_name
-  type    = "AAAA"
+  zone_id         = local.hosted_zone_id
+  name            = var.domain_name
+  type            = "AAAA"
+  allow_overwrite = true
 
   alias {
     name                   = aws_cloudfront_distribution.app.domain_name
