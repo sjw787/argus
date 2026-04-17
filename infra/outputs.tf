@@ -1,3 +1,11 @@
+output "hosted_zone_name_servers" {
+  description = <<-EOT
+    NS records for the newly created hosted zone (only set when create_hosted_zone = true).
+    Add these as an NS record for your subdomain in the parent/legacy account's hosted zone.
+  EOT
+  value = var.create_hosted_zone ? aws_route53_zone.app[0].name_servers : null
+}
+
 output "cloudfront_distribution_id" {
   description = "CloudFront distribution ID (for cache invalidations)"
   value       = aws_cloudfront_distribution.app.id

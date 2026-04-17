@@ -5,8 +5,19 @@ variable "domain_name" {
 }
 
 variable "hosted_zone_id" {
-  description = "Route 53 hosted zone ID for the domain"
+  description = "Existing Route 53 hosted zone ID. Required when create_hosted_zone = false (default)."
   type        = string
+  default     = ""
+}
+
+variable "create_hosted_zone" {
+  description = <<-EOT
+    When false (default), use an existing hosted zone specified by hosted_zone_id.
+    When true, create a new hosted zone for domain_name in this account and output
+    the NS records to add to your parent zone (e.g. in a legacy account).
+  EOT
+  type        = bool
+  default     = false
 }
 
 variable "aws_region" {

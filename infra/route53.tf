@@ -1,5 +1,17 @@
+# Optionally create a hosted zone in this account (cross-account subdomain delegation).
+# Default: use an existing zone via var.hosted_zone_id.
+resource "aws_route53_zone" "app" {
+  count   = var.create_hosted_zone ? 1 : 0
+  name    = var.domain_name
+  comment = "Managed by Terraform — AthenaBeaver ${var.environment}"
+}
+
+locals {
+  hosted_zone_id = var.create_hosted_zone ? aws_route53_zone.app[0].zone_id : var.hosted_zone_id
+}
+
 resource "aws_route53_record" "app_a" {
-  zone_id = var.hosted_zone_id
+  zone_id = local.hosted_zone_id
   name    = var.domain_name
   type    = "A"
 
@@ -11,7 +23,7 @@ resource "aws_route53_record" "app_a" {
 }
 
 resource "aws_route53_record" "app_aaaa" {
-  zone_id = var.hosted_zone_id
+  zone_id = local.hosted_zone_id
   name    = var.domain_name
   type    = "AAAA"
 
@@ -21,3 +33,4 @@ resource "aws_route53_record" "app_aaaa" {
     evaluate_target_health = false
   }
 }
+
