@@ -99,7 +99,14 @@ def create_app(config_path: Optional[Path] = None) -> FastAPI:
     if _cors_env:
         cors_origins = [o.strip() for o in _cors_env.split(",") if o.strip()]
     elif os.environ.get("LAMBDA_RUNTIME"):
-        cors_origins = ["*"]
+        # In Lambda mode ARGUS_CORS_ORIGINS must be set explicitly (it's injected by
+        # Terraform via the CloudFront domain). Falling back to "*" with
+        # allow_credentials=True violates the CORS spec and creates a CSRF risk.
+        # Raise at startup so the misconfiguration is caught immediately.
+        raise RuntimeError(
+            "ARGUS_CORS_ORIGINS must be set when running in Lambda mode. "
+            "Set it to the CloudFront/custom domain, e.g. https://argus.example.com"
+        )
     else:
         cors_origins = _default_local_origins
 

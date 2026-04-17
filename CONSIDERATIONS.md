@@ -10,7 +10,7 @@ The premise: *AI can write the code, but a human still has to own the outcome.* 
 
 A full test suite covers the core application logic. Tests were written alongside the code and validated against the real application behaviour.
 
-**74 tests passing across 8 test modules:**
+**90 tests passing across 9 test modules:**
 
 | Module | What It Covers |
 |--------|---------------|
@@ -20,15 +20,18 @@ A full test suite covers the core application logic. Tests were written alongsid
 | `test_athena_service.py` | Athena service layer (start, poll, fetch results) |
 | `test_catalog_service.py` | Glue catalog service layer |
 | `test_workgroup_service.py` | Workgroup service and client-ID matching logic |
-| `test_config.py` | Configuration loading and env-var overrides |
+| `test_config.py` | Configuration loading, env-var overrides, and Lambda DynamoDB persistence |
 | `test_naming.py` | Client naming schema parsing and workgroup resolution |
+| `test_api_config.py` | Config API endpoints and workgroup assignment persistence |
 
 Tests use `pytest` with `unittest.mock` to isolate AWS API calls. No real AWS credentials or network access are required to run the suite.
 
 ```bash
 PYTHONPATH=src python -m pytest tests/ -q
-# 74 passed
+# 90 passed
 ```
+
+Current line coverage: **46%** (target: 87%). Coverage is enforced by a pre-push ratchet hook — it can only go up between pushes.
 
 ---
 
@@ -46,6 +49,19 @@ Findings and resolutions:
 | 🟠 High | Cognito JWT validation missing issuer check — any Cognito pool's token accepted | Added `issuer` verification against `https://cognito-idp.{region}.amazonaws.com/{pool_id}` |
 | 🟠 High | SSO credentials used without checking expiration — expired creds caused cryptic errors | Added expiration check; expired sessions are deleted and a `401` is returned immediately |
 | 🟡 Medium | DynamoDB table storing raw AWS credentials lacked encryption | Added KMS Customer Managed Key with annual key rotation |
+
+### Review 3 — Security & CORS Hardening (April 2026)
+
+| Severity | Issue | Resolution |
+|----------|-------|------------|
+| 🔴 Critical | `allow_origins=["*"]` combined with `allow_credentials=True` in Lambda mode when `ARGUS_CORS_ORIGINS` was not set — violates CORS spec and creates CSRF risk on the `/auth/logout` endpoint | Lambda startup now raises `RuntimeError` if `ARGUS_CORS_ORIGINS` is unset; wildcard origins are never used with credentials |
+| ✅ | AWS credentials never appear in logs or error responses | Confirmed |
+| ✅ | No SQL injection risk — queries pass through boto3 to Athena's own parser | Confirmed |
+| ✅ | DynamoDB session store uses key-value operations with no injection vectors | Confirmed |
+| ✅ | No XSS vectors — `dangerouslySetInnerHTML` not used anywhere in the frontend | Confirmed |
+| ✅ | No open redirects — SSO URLs come from AWS API; GitHub link is hardcoded | Confirmed |
+| ✅ | `localStorage` holds only non-sensitive UI state and a session identifier; no raw AWS keys | Confirmed |
+| ✅ | GitHub Actions workflows do not echo secrets to logs | Confirmed |
 
 ### Review 2 — Privacy & Data Handling
 
@@ -70,7 +86,7 @@ Beyond the code review fixes, the following security practices are in place:
 - **Secrets**: No secrets are hardcoded. All sensitive values are environment variables or AWS-managed.
 - **Credentials at rest**: Temporary AWS credentials (Lambda/SSO mode) are stored in DynamoDB encrypted with a KMS CMK. TTL auto-expires entries.
 - **Transport**: HTTPS enforced end-to-end (CloudFront → API Gateway → Lambda). HTTP redirected to HTTPS at CloudFront.
-- **CORS**: Configurable via `ARGUS_CORS_ORIGINS` env var — not open by default in Lambda mode.
+- **CORS**: Locked to the explicit `ARGUS_CORS_ORIGINS` env var. In Lambda mode the application refuses to start if this is unset — wildcard origins (`*`) are never combined with `allow_credentials=True`.
 - **Dependency scanning**: GitHub Actions CI runs on every push.
 
 ---
