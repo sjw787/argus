@@ -1,5 +1,7 @@
 # Argus for Athena 🦫
 
+[![codecov](https://codecov.io/gh/sjw787/argus/graph/badge.svg)](https://codecov.io/gh/sjw787/argus)
+
 A browser-based database manager for **AWS Athena** — inspired by DBeaver. Browse schemas, write and execute SQL, view results, and manage workgroups from a clean web UI. Runs locally or deployed to AWS Lambda + CloudFront.
 
 ---
