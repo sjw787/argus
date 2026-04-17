@@ -44,13 +44,15 @@ Coverage is enforced automatically by a pre-push git hook (`scripts/pre-push`). 
 bash scripts/install-hooks.sh
 ```
 
-The hook enforces a two-phase coverage policy:
+The hook enforces a two-phase coverage policy with a **ratchet**:
 
 | Phase | Condition | Behaviour |
 |-------|-----------|-----------|
-| **Working toward target** | Coverage < 87% | Push allowed with a warning. Add tests to close the gap. |
-| **Target achieved** | Coverage first reaches 87% | `.coverage-threshold-met` is created and committed automatically. |
+| **Ratchet active** | Coverage < 87% | Push **blocked** if coverage dropped below `.coverage-baseline`. Otherwise allowed with progress warning. Baseline updated on every successful push. |
+| **Target achieved** | Coverage first reaches 87% | `.coverage-threshold-met` is created. Ratchet replaced by floor. |
 | **Floor enforced** | Coverage < 85% after target met | **Push blocked.** Restore coverage before pushing. |
+
+The `.coverage-baseline` file is committed to the repo and updated automatically after every successful push. This means coverage can only ever go up (or hold) until the 87% target is reached.
 
 **As an agent, when you add new features or modify existing code:**
 1. Add or update tests to cover the new behaviour
