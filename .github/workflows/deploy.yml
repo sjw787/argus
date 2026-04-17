@@ -182,6 +182,46 @@ jobs:
                 aws_route53_record.app_aaaa "${HZ_ID}_abvr.samwylock.com_AAAA" || true
             fi
           fi
+          # Import orphan SSO resources if they exist but aren't in state
+          if [ "${TF_VAR_manage_sso}" = "true" ]; then
+            SSO_INSTANCE_ARN=$(aws sso-admin list-instances --region "${AWS_REGION}" --query 'Instances[0].InstanceArn' --output text 2>/dev/null || true)
+            IDENTITY_STORE_ID=$(aws sso-admin list-instances --region "${AWS_REGION}" --query 'Instances[0].IdentityStoreId' --output text 2>/dev/null || true)
+            if [ -n "$SSO_INSTANCE_ARN" ] && [ "$SSO_INSTANCE_ARN" != "None" ]; then
+              PS_NAME="ArgusAthenaAccess-${ENVIRONMENT}"
+              PS_ARN=$(aws sso-admin list-permission-sets --instance-arn "$SSO_INSTANCE_ARN" --region "${AWS_REGION}" --query 'PermissionSets[*]' --output text | tr '\t' '\n' | while read arn; do
+                name=$(aws sso-admin describe-permission-set --instance-arn "$SSO_INSTANCE_ARN" --permission-set-arn "$arn" --region "${AWS_REGION}" --query 'PermissionSet.Name' --output text 2>/dev/null)
+                [ "$name" = "$PS_NAME" ] && echo "$arn" && break
+              done)
+              TF_IMPORT_OPTS="-var=environment=${ENVIRONMENT} -var=image_uri=${IMAGE_URI}"
+              if [ -n "$PS_ARN" ]; then
+                if ! terraform state list | grep -q 'aws_ssoadmin_permission_set.athena_access'; then
+                  echo "Importing permission set $PS_ARN..."
+                  terraform import $TF_IMPORT_OPTS 'aws_ssoadmin_permission_set.athena_access[0]' "${PS_ARN},${SSO_INSTANCE_ARN}" || true
+                fi
+                if ! terraform state list | grep -q 'aws_ssoadmin_managed_policy_attachment.athena_full'; then
+                  echo "Importing Athena managed policy attachment..."
+                  terraform import $TF_IMPORT_OPTS 'aws_ssoadmin_managed_policy_attachment.athena_full[0]' "arn:aws:iam::aws:policy/AmazonAthenaFullAccess,${PS_ARN},${SSO_INSTANCE_ARN}" || true
+                fi
+                if ! terraform state list | grep -q 'aws_ssoadmin_managed_policy_attachment.glue_readonly'; then
+                  echo "Importing Glue managed policy attachment..."
+                  terraform import $TF_IMPORT_OPTS 'aws_ssoadmin_managed_policy_attachment.glue_readonly[0]' "arn:aws:iam::aws:policy/AWSGlueConsoleFullAccess,${PS_ARN},${SSO_INSTANCE_ARN}" || true
+                fi
+              fi
+              if [ -n "$IDENTITY_STORE_ID" ] && [ "$IDENTITY_STORE_ID" != "None" ]; then
+                GROUP_ID=$(aws identitystore list-groups --identity-store-id "$IDENTITY_STORE_ID" --region "${AWS_REGION}" --query "Groups[?DisplayName=='ArgusUsers'].GroupId | [0]" --output text 2>/dev/null || true)
+                if [ -n "$GROUP_ID" ] && [ "$GROUP_ID" != "None" ]; then
+                  if ! terraform state list | grep -q 'aws_identitystore_group.argus_users'; then
+                    echo "Importing identity store group $GROUP_ID..."
+                    terraform import $TF_IMPORT_OPTS 'aws_identitystore_group.argus_users[0]' "${IDENTITY_STORE_ID}/${GROUP_ID}" || true
+                  fi
+                  if [ -n "$PS_ARN" ] && ! terraform state list | grep -q 'aws_ssoadmin_account_assignment.argus_users'; then
+                    echo "Importing account assignment..."
+                    terraform import $TF_IMPORT_OPTS 'aws_ssoadmin_account_assignment.argus_users[0]' "${GROUP_ID},GROUP,${AWS_ACCOUNT_ID},AWS_ACCOUNT,${PS_ARN},${SSO_INSTANCE_ARN}" || true
+                  fi
+                fi
+              fi
+            fi
+          fi
           terraform apply \
             -var="environment=${ENVIRONMENT}" \
             -var="image_uri=${IMAGE_URI}" \

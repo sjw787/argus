@@ -55,3 +55,7 @@ frontend/dist/
 frontend/.env.local
 frontend/.env.*.local
 44
+
+infra/.terraform/
+infra/.terraform.lock.hcl
+infra/terraform.tfstate*
