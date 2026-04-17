@@ -10,12 +10,12 @@ terraform {
       version = "~> 3.0"
     }
   }
-  # Uncomment to use S3 backend (replace with your values):
-  # backend "s3" {
-  #   bucket = "your-terraform-state-bucket"
-  #   key    = "argus-for-athena/terraform.tfstate"
-  #   region = "us-east-1"
-  # }
+  # S3 backend for persistent state across CI runs
+  backend "s3" {
+    bucket = "argus-terraform-state-052869941234"
+    key    = "argus-for-athena/terraform.tfstate"
+    region = "us-east-1"
+  }
 }
 
 provider "aws" {
