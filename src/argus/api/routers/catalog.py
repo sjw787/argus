@@ -91,17 +91,22 @@ def list_databases(
         all_dbs = _db_cache.get(cache_key)
         if all_dbs is None:
             resolver = get_resolver(config)
+            assignments = config.workgroups.assignments
             all_dbs = []
             next_token = None
             while True:
                 resp = svc.list_databases(catalog_id=catalog_id, next_token=next_token)
                 for db in resp.get("DatabaseList", []):
+                    db_name = db["Name"]
+                    wg = assignments.get(db_name) or (
+                        resolver.resolve_workgroup(db_name) if resolver else None
+                    )
                     all_dbs.append(DatabaseItem(
-                        name=db["Name"],
+                        name=db_name,
                         description=db.get("Description"),
                         location_uri=db.get("LocationUri"),
                         parameters=db.get("Parameters", {}),
-                        workgroup=resolver.resolve_workgroup(db["Name"]) if resolver else None,
+                        workgroup=wg,
                     ))
                 next_token = resp.get("NextToken")
                 if not next_token:

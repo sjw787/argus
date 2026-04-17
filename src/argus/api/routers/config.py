@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from argus.api.schemas import ConfigInfo, NamingSchemaInfo
 from argus.api.dependencies import get_config
+from argus.api.routers.catalog import _db_cache
 from argus.models.schemas import AppConfig
 from argus.core.config import save_config
 
@@ -72,6 +73,7 @@ def assign_database(body: DatabaseAssignmentRequest, config: Annotated[AppConfig
     updated_workgroups = config.workgroups.model_copy(update={"assignments": updated_assignments})
     updated_config = config.model_copy(update={"workgroups": updated_workgroups})
     save_config(updated_config)
+    _db_cache.invalidate_all()
     return DatabaseAssignmentsResponse(assignments=updated_assignments)
 
 
@@ -81,5 +83,6 @@ def unassign_database(database: str, config: Annotated[AppConfig, Depends(get_co
     updated_workgroups = config.workgroups.model_copy(update={"assignments": updated_assignments})
     updated_config = config.model_copy(update={"workgroups": updated_workgroups})
     save_config(updated_config)
+    _db_cache.invalidate_all()
     return DatabaseAssignmentsResponse(assignments=updated_assignments)
 

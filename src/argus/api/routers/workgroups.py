@@ -137,6 +137,21 @@ def resolve_workgroup(
     config: Annotated[AppConfig, Depends(get_config)],
     schema_name: Optional[str] = Query(default=None),
 ):
+    # Explicit UI-managed assignment always wins.
+    assigned = config.workgroups.assignments.get(database_name)
+    if assigned:
+        output = (
+            config.workgroups.output_locations.get(assigned)
+            or config.defaults.output_location
+        )
+        return WorkgroupResolveResult(
+            database=database_name,
+            workgroup=assigned,
+            parsed_parts=None,
+            output_location=output,
+            matched=True,
+        )
+
     resolver = get_resolver(config, schema_name)
     if resolver is None:
         return WorkgroupResolveResult(database=database_name, matched=False)

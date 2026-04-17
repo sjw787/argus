@@ -186,6 +186,10 @@ class AthenaService:
         )
 
     def _resolve_workgroup(self, database: str, schema_name: Optional[str]) -> Optional[str]:
+        # Explicit UI-managed assignment takes precedence over any naming schema.
+        assigned = self._config.workgroups.assignments.get(database)
+        if assigned:
+            return assigned
         resolver = get_resolver(self._config, schema_name)
         if resolver is None:
             return None
