@@ -153,7 +153,7 @@ jobs:
           CF_IN_STATE=$(terraform state list | grep 'aws_cloudfront_distribution.app' || true)
           if [ -z "$CF_IN_STATE" ]; then
             ORPHAN_CF=$(aws cloudfront list-distributions \
-              --query "DistributionList.Items[?Aliases.Items[?contains(@,'abvr.samwylock.com')]].Id" \
+              --query "DistributionList.Items[?Aliases.Items[?contains(@,'argus.samwylock.com')]].Id" \
               --output text 2>/dev/null || true)
             if [ -n "$ORPHAN_CF" ]; then
               echo "Importing orphan CloudFront distribution: $ORPHAN_CF"
@@ -164,22 +164,22 @@ jobs:
             fi
           fi
           # Import orphan Route53 records if they exist but aren't in state
-          HZ_ID=$(aws route53 list-hosted-zones-by-name --dns-name "abvr.samwylock.com" \
-            --query "HostedZones[?Name=='abvr.samwylock.com.'].Id" --output text | sed 's|/hostedzone/||' || true)
+          HZ_ID=$(aws route53 list-hosted-zones-by-name --dns-name "argus.samwylock.com" \
+            --query "HostedZones[?Name=='argus.samwylock.com.'].Id" --output text | sed 's|/hostedzone/||' || true)
           if [ -n "$HZ_ID" ]; then
             if ! terraform state list | grep -q 'aws_route53_record.app_a'; then
               echo "Importing Route53 A record..."
               terraform import \
                 -var="environment=${ENVIRONMENT}" \
                 -var="image_uri=${IMAGE_URI}" \
-                aws_route53_record.app_a "${HZ_ID}_abvr.samwylock.com_A" || true
+                aws_route53_record.app_a "${HZ_ID}_argus.samwylock.com_A" || true
             fi
             if ! terraform state list | grep -q 'aws_route53_record.app_aaaa'; then
               echo "Importing Route53 AAAA record..."
               terraform import \
                 -var="environment=${ENVIRONMENT}" \
                 -var="image_uri=${IMAGE_URI}" \
-                aws_route53_record.app_aaaa "${HZ_ID}_abvr.samwylock.com_AAAA" || true
+                aws_route53_record.app_aaaa "${HZ_ID}_argus.samwylock.com_AAAA" || true
             fi
           fi
           # Import primary Athena workgroup (always exists; we manage its OutputLocation)
@@ -240,7 +240,7 @@ jobs:
           echo "S3_BUCKET=${S3_BUCKET}" >> $GITHUB_ENV
           echo "CF_ID=${CF_ID}" >> $GITHUB_ENV
           echo "## Subdomain NS Records" >> $GITHUB_STEP_SUMMARY
-          echo "Add these NS records for \`abvr.samwylock.com\` in your parent hosted zone:" >> $GITHUB_STEP_SUMMARY
+          echo "Add these NS records for \`argus.samwylock.com\` in your parent hosted zone:" >> $GITHUB_STEP_SUMMARY
           terraform output -json hosted_zone_name_servers | jq -r '.[]' | while read ns; do echo "- \`$ns\`"; done >> $GITHUB_STEP_SUMMARY || true
       - name: Force Lambda to pull latest ECR image
         if: ${{ !inputs.skip_builds }}

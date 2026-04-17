@@ -26,7 +26,7 @@ Set `auth_mode = "cognito"` in your Terraform variables file (or via `-var`):
 ```hcl
 # terraform.tfvars
 auth_mode        = "cognito"
-domain_name      = "abvr.samwylock.com"
+domain_name      = "argus.samwylock.com"
 hosted_zone_id   = "ZXXXXXXXXXXXXX"
 output_location  = "s3://my-athena-results/prefix/"
 ```

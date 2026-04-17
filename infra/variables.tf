@@ -1,7 +1,7 @@
 variable "domain_name" {
-  description = "The custom domain for the application (e.g. abvr.samwylock.com)"
+  description = "The custom domain for the application (e.g. argus.samwylock.com)"
   type        = string
-  default     = "abvr.samwylock.com"
+  default     = "argus.samwylock.com"
 }
 
 variable "hosted_zone_id" {
