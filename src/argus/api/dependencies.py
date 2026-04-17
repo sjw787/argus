@@ -127,14 +127,20 @@ def _boto3_session_from_credential_id(
         return None
     expiration = creds_data.get("expiration")
     if expiration:
+        expiry_dt = None
         try:
-            expiry_dt = datetime.fromisoformat(expiration.replace("Z", "+00:00"))
-            if datetime.now(timezone.utc) >= expiry_dt:
-                from argus.core.session_store import delete_session
-                delete_session(f"creds:{credential_id}")
-                return None
+            # ISO 8601 (new format)
+            expiry_dt = datetime.fromisoformat(str(expiration).replace("Z", "+00:00"))
         except ValueError:
-            logger.warning("Could not parse credential expiration: %s", expiration)
+            # Legacy: Unix timestamp in milliseconds (int or numeric string)
+            try:
+                expiry_dt = datetime.fromtimestamp(int(expiration) / 1000, tz=timezone.utc)
+            except (ValueError, TypeError):
+                logger.warning("Could not parse credential expiration: %s", expiration)
+        if expiry_dt and datetime.now(timezone.utc) >= expiry_dt:
+            from argus.core.session_store import delete_session
+            delete_session(f"creds:{credential_id}")
+            return None
     return get_session_from_credentials(
         access_key_id=creds_data["access_key_id"],
         secret_access_key=creds_data["secret_access_key"],

@@ -4,6 +4,7 @@ import configparser
 import dataclasses
 import os
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated, Optional
 
@@ -64,6 +65,25 @@ def get_auth_config():
 
 # ── Status ────────────────────────────────────────────────────────────────────
 
+
+def _credentials_still_valid(creds_data: dict) -> bool:
+    """Return True if stored SSO credentials have not yet expired."""
+    expiration = creds_data.get("expiration")
+    if not expiration:
+        # No expiration stored — assume valid (caller decides)
+        return True
+    expiry_dt = None
+    try:
+        expiry_dt = datetime.fromisoformat(str(expiration).replace("Z", "+00:00"))
+    except ValueError:
+        try:
+            # Legacy: Unix timestamp in milliseconds
+            expiry_dt = datetime.fromtimestamp(int(expiration) / 1000, tz=timezone.utc)
+        except (ValueError, TypeError):
+            return False
+    return datetime.now(timezone.utc) < expiry_dt
+
+
 @router.get("/status", response_model=AuthStatusResponse)
 def get_auth_status(
     config: Annotated[AppConfig, Depends(get_config)],
@@ -83,7 +103,7 @@ def get_auth_status(
     # Fast path: credential stored in session store (Lambda SSO mode)
     if x_credential_id:
         creds_data = get_session(f"creds:{x_credential_id}")
-        if creds_data:
+        if creds_data and _credentials_still_valid(creds_data):
             resolved_profile = creds_data.get("profile") or profile or config.aws.profile
             return AuthStatusResponse(
                 authenticated=True,
@@ -91,6 +111,10 @@ def get_auth_status(
                 region=resolved_region,
                 profiles=profiles,
             )
+        # Purge stale session so subsequent refreshes don't loop through 401s
+        if creds_data and not _credentials_still_valid(creds_data):
+            from argus.core.session_store import delete_session
+            delete_session(f"creds:{x_credential_id}")
 
     # Fallback: check local AWS profile credentials (local dev mode)
     resolved_profile = profile or config.aws.profile
