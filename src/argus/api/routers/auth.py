@@ -311,7 +311,7 @@ def sso_select_role(body: SsoSelectRoleRequest):
                 "expiration": creds.expiration,
                 "region": session.region,
             },
-            ttl_seconds=3600,
+            ttl_seconds=28800,  # 8 hours — matches SSO credential lifetime
         )
         message = (
             f"Credentials stored for Lambda session '{body.profile_name}'. "

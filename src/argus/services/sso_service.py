@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import configparser
 import time
+from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -165,11 +166,20 @@ class SsoService:
             roleName=role_name,
         )
         creds = resp["roleCredentials"]
+        # expiration from get_role_credentials is Unix ms timestamp (int).
+        # Convert to ISO 8601 so boto3 can parse it correctly.
+        raw_expiry = creds.get("expiration", "")
+        try:
+            expiration = datetime.fromtimestamp(int(raw_expiry) / 1000, tz=timezone.utc).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            )
+        except (ValueError, TypeError):
+            expiration = str(raw_expiry)
         return SsoCredentials(
             access_key_id=creds["accessKeyId"],
             secret_access_key=creds["secretAccessKey"],
             session_token=creds["sessionToken"],
-            expiration=str(creds.get("expiration", "")),
+            expiration=expiration,
         )
 
     # ── Step 6: persist to ~/.aws ─────────────────────────────────────────────
