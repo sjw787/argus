@@ -280,6 +280,7 @@ class SsoSelectRoleResponse(BaseModel):
     profile_name: str
     expiration: str
     message: str
+    credential_id: Optional[str] = None  # Set in Lambda mode; send as X-Credential-Id header
 
 
 class AuthStatusResponse(BaseModel):
@@ -291,3 +292,20 @@ class AuthStatusResponse(BaseModel):
 
 class ProfileSelectRequest(BaseModel):
     profile_name: str
+
+
+class QueryStatusSnapshot(BaseModel):
+    execution_id: str
+    state: str
+    state_change_reason: Optional[str] = None
+    query: Optional[str] = None
+    submitted_at: Optional[str] = None
+    completed_at: Optional[str] = None
+
+
+class AuthConfigResponse(BaseModel):
+    mode: str  # "sso" | "cognito" | "none"
+    streaming: bool = True
+    cognito_user_pool_id: Optional[str] = None
+    cognito_client_id: Optional[str] = None
+    cognito_domain: Optional[str] = None

@@ -22,6 +22,15 @@ apiClient.interceptors.response.use(
   }
 )
 
+// Inject X-Credential-Id header for Lambda SSO mode
+apiClient.interceptors.request.use(config => {
+  const credentialId = useAuthStore.getState().credentialId
+  if (credentialId) {
+    config.headers['X-Credential-Id'] = credentialId
+  }
+  return config
+})
+
 // Types matching the backend Pydantic schemas
 export interface ExecuteQueryRequest {
   sql: string
@@ -57,6 +66,23 @@ export interface QueryExecutionDetail {
   status: QueryStatus
   stats: QueryStats
   output_location?: string
+}
+
+export interface QueryStatusSnapshot {
+  execution_id: string
+  state: string
+  state_change_reason?: string
+  query?: string
+  submitted_at?: string
+  completed_at?: string
+}
+
+export interface AuthConfig {
+  mode: 'sso' | 'cognito' | 'none'
+  streaming: boolean
+  cognitoUserPoolId?: string
+  cognitoClientId?: string
+  cognitoDomain?: string
 }
 
 export interface ResultColumn {
@@ -229,6 +255,7 @@ export interface SsoSelectRoleResponse {
   profile_name: string
   expiration: string
   message: string
+  credential_id?: string  // Lambda mode: send as X-Credential-Id header
 }
 
 // API functions
@@ -360,4 +387,17 @@ export const api = {
 
   getSsoConfig: () =>
     apiClient.get<{ start_url?: string; region?: string; profile?: string }>('/auth/sso-config').then(r => r.data),
+
+  getQueryStatus: (id: string) =>
+    apiClient.get<QueryStatusSnapshot>(`/queries/${id}/status`).then(r => r.data),
+
+  getAuthConfig: (): Promise<AuthConfig> =>
+    apiClient.get<{ mode: string; streaming: boolean; cognito_user_pool_id?: string; cognito_client_id?: string; cognito_domain?: string }>('/auth/config')
+      .then(r => ({
+        mode: r.data.mode as AuthConfig['mode'],
+        streaming: r.data.streaming,
+        cognitoUserPoolId: r.data.cognito_user_pool_id,
+        cognitoClientId: r.data.cognito_client_id,
+        cognitoDomain: r.data.cognito_domain,
+      })),
 }

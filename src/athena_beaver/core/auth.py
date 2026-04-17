@@ -6,6 +6,21 @@ import boto3
 _session_cache: dict[tuple, boto3.Session] = {}
 
 
+def get_session_from_credentials(
+    access_key_id: str,
+    secret_access_key: str,
+    session_token: Optional[str] = None,
+    region: Optional[str] = None,
+) -> boto3.Session:
+    """Create a boto3 Session from explicit credentials (used in Lambda SSO mode)."""
+    return boto3.Session(
+        aws_access_key_id=access_key_id,
+        aws_secret_access_key=secret_access_key,
+        aws_session_token=session_token or None,
+        region_name=region,
+    )
+
+
 def get_session(
     profile: Optional[str] = None,
     region: Optional[str] = None,

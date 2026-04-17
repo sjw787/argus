@@ -135,7 +135,7 @@ export function SsoLoginDialog({ onAuthenticated, expired = false }: Props) {
       const resp = await api.ssoSelectRole(sessionId, selectedAccount.account_id, selectedRole.role_name, profileName)
       const profiles = await api.listProfiles()
       setProfiles(profiles)
-      setAuth(resp.profile_name, region)
+      setAuth(resp.profile_name, region, resp.credential_id ?? null)
       setStep('done')
       setTimeout(onAuthenticated, 1200)
     } catch (e: unknown) {

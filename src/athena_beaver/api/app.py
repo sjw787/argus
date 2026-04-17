@@ -1,4 +1,5 @@
 from __future__ import annotations
+import os
 import webbrowser
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -89,13 +90,22 @@ def create_app(config_path: Optional[Path] = None) -> FastAPI:
             content={"detail": exc.detail},
         )
 
+    _default_local_origins = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+    ]
+    _cors_env = os.environ.get("AB_CORS_ORIGINS", "")
+    if _cors_env:
+        cors_origins = [o.strip() for o in _cors_env.split(",") if o.strip()]
+    elif os.environ.get("LAMBDA_RUNTIME"):
+        cors_origins = ["*"]
+    else:
+        cors_origins = _default_local_origins
+
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-            "http://localhost:3000",
-        ],
+        allow_origins=cors_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -108,7 +118,7 @@ def create_app(config_path: Optional[Path] = None) -> FastAPI:
     app.include_router(export.router, prefix="/api/v1")
     app.include_router(auth.router, prefix="/api/v1")
 
-    if STATIC_DIR.exists() and (STATIC_DIR / "index.html").exists():
+    if not os.environ.get("LAMBDA_RUNTIME") and STATIC_DIR.exists() and (STATIC_DIR / "index.html").exists():
         app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
 
     return app

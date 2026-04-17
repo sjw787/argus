@@ -9,7 +9,7 @@ from athena_beaver.api.schemas import (
     ExecuteQueryRequest, ExecuteQueryResponse, QueryExecutionDetail,
     QueryStatus, QueryStats, QueryResults, ResultColumn, QueryListItem,
     NamedQueryCreate, NamedQueryItem, PreparedStatementCreate,
-    PreparedStatementUpdate, PreparedStatementItem,
+    PreparedStatementUpdate, PreparedStatementItem, QueryStatusSnapshot,
 )
 from athena_beaver.api.dependencies import get_athena_service, get_config
 from athena_beaver.api.sse import query_status_stream
@@ -368,6 +368,28 @@ def get_query(
     try:
         resp = svc.get_query_execution(query_id)
         return _parse_execution(resp["QueryExecution"])
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/{query_id}/status", response_model=QueryStatusSnapshot)
+def get_query_status(
+    query_id: str,
+    svc: Annotated[AthenaService, Depends(get_athena_service)],
+):
+    """Single-shot status check — compatible with API Gateway (no streaming)."""
+    try:
+        resp = svc.get_query_execution(query_id)
+        qe = resp["QueryExecution"]
+        status = qe.get("Status", {})
+        return QueryStatusSnapshot(
+            execution_id=query_id,
+            state=status.get("State", "UNKNOWN"),
+            state_change_reason=status.get("StateChangeReason"),
+            query=qe.get("Query"),
+            submitted_at=str(status.get("SubmissionDateTime", "")) or None,
+            completed_at=str(status.get("CompletionDateTime", "")) or None,
+        )
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
 

@@ -34,6 +34,7 @@ class AppConfig(BaseModel):
     active_schema: str = "default"
     workgroups: WorkgroupConfig = Field(default_factory=WorkgroupConfig)
     defaults: DefaultsConfig = Field(default_factory=DefaultsConfig)
+    auth_mode: str = "sso"
     locked_settings: list[str] = Field(
         default_factory=list,
         description=(

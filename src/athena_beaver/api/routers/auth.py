@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import configparser
+import dataclasses
+import os
 import uuid
 from pathlib import Path
 from typing import Annotated, Optional
@@ -10,6 +12,7 @@ from pydantic import BaseModel
 
 from athena_beaver.api.schemas import (
     AuthStatusResponse,
+    AuthConfigResponse,
     ProfileSelectRequest,
     SsoAccount,
     SsoPollResponse,
@@ -21,20 +24,42 @@ from athena_beaver.api.schemas import (
 )
 from athena_beaver.api.dependencies import get_config
 from athena_beaver.core.auth import reset_session_cache
+from athena_beaver.core.session_store import (
+    delete_session,
+    delete_token,
+    get_session,
+    get_token,
+    put_session,
+    put_token,
+)
 from athena_beaver.models.schemas import AppConfig
 from athena_beaver.services.sso_service import DeviceAuthSession, SsoService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-# In-memory store: session_id → DeviceAuthSession + optional access_token
-_sessions: dict[str, DeviceAuthSession] = {}
-_tokens: dict[str, str] = {}  # session_id → access_token
 
 
 class SsoConfigResponse(BaseModel):
     start_url: Optional[str] = None
     region: Optional[str] = None
     profile: Optional[str] = None
+
+
+class AuthModeResponse(BaseModel):
+    mode: str
+
+
+# ── Auth mode ─────────────────────────────────────────────────────────────────
+
+@router.get("/config", response_model=AuthConfigResponse)
+def get_auth_config():
+    """Return frontend auth / feature configuration (no credentials required)."""
+    return AuthConfigResponse(
+        mode=os.environ.get("AB_AUTH_MODE", "sso"),
+        streaming=os.environ.get("LAMBDA_RUNTIME", "") != "1",
+        cognito_user_pool_id=os.environ.get("AB_COGNITO_USER_POOL_ID") or None,
+        cognito_client_id=os.environ.get("AB_COGNITO_CLIENT_ID") or None,
+        cognito_domain=os.environ.get("AB_COGNITO_DOMAIN") or None,
+    )
 
 
 # ── Status ────────────────────────────────────────────────────────────────────
@@ -134,7 +159,7 @@ def sso_start(body: SsoStartRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     session_id = str(uuid.uuid4())
-    _sessions[session_id] = session
+    put_session(session_id, dataclasses.asdict(session))
 
     return SsoStartResponse(
         session_id=session_id,
@@ -152,24 +177,26 @@ def sso_poll(session_id: str):
     Poll once to see if the user has completed browser authentication.
     Frontend calls this every `interval` seconds.
     """
-    session = _sessions.get(session_id)
-    if not session:
+    session_data = get_session(session_id)
+    if not session_data:
         raise HTTPException(status_code=404, detail="Session not found.")
+    session = DeviceAuthSession(**session_data)
 
-    if session_id in _tokens:
-        return SsoPollResponse(status="success", access_token=_tokens[session_id])
+    token = get_token(session_id)
+    if token:
+        return SsoPollResponse(status="success", access_token=token)
 
     svc = SsoService(region=session.region)
     try:
         token = svc.poll_token(session)
     except RuntimeError as exc:
-        _sessions.pop(session_id, None)
+        delete_session(session_id)
         detail = str(exc)
         status = "expired" if "expired" in detail.lower() else "denied"
         return SsoPollResponse(status=status)
 
     if token:
-        _tokens[session_id] = token
+        put_token(session_id, token)
         return SsoPollResponse(status="success", access_token=token)
 
     return SsoPollResponse(status="pending")
@@ -178,13 +205,14 @@ def sso_poll(session_id: str):
 @router.get("/sso/{session_id}/accounts", response_model=list[SsoAccount])
 def sso_list_accounts(session_id: str):
     """List AWS accounts accessible with the SSO access token."""
-    token = _tokens.get(session_id)
+    token = get_token(session_id)
     if not token:
         raise HTTPException(status_code=400, detail="Not authenticated yet.")
 
-    session = _sessions.get(session_id)
-    if not session:
+    session_data = get_session(session_id)
+    if not session_data:
         raise HTTPException(status_code=404, detail="Session not found.")
+    session = DeviceAuthSession(**session_data)
 
     svc = SsoService(region=session.region)
     try:
@@ -201,13 +229,14 @@ def sso_list_accounts(session_id: str):
 @router.get("/sso/{session_id}/accounts/{account_id}/roles", response_model=list[SsoRole])
 def sso_list_roles(session_id: str, account_id: str):
     """List IAM roles available for a given account."""
-    token = _tokens.get(session_id)
+    token = get_token(session_id)
     if not token:
         raise HTTPException(status_code=400, detail="Not authenticated yet.")
 
-    session = _sessions.get(session_id)
-    if not session:
+    session_data = get_session(session_id)
+    if not session_data:
         raise HTTPException(status_code=404, detail="Session not found.")
+    session = DeviceAuthSession(**session_data)
 
     svc = SsoService(region=session.region)
     try:
@@ -221,42 +250,73 @@ def sso_list_roles(session_id: str, account_id: str):
 @router.post("/sso/select-role", response_model=SsoSelectRoleResponse)
 def sso_select_role(body: SsoSelectRoleRequest):
     """
-    Fetch role credentials and save them as a named profile in ~/.aws/credentials.
+    Fetch role credentials.
+    - Local dev: saves them as a named profile in ~/.aws/credentials.
+    - Lambda (LAMBDA_RUNTIME=1): stores credentials in session_store and returns
+      a credential_id the frontend should send as X-Credential-Id on future requests.
     """
-    token = _tokens.get(body.session_id)
+    token = get_token(body.session_id)
     if not token:
         raise HTTPException(status_code=400, detail="Not authenticated yet.")
 
-    session = _sessions.get(body.session_id)
-    if not session:
+    session_data = get_session(body.session_id)
+    if not session_data:
         raise HTTPException(status_code=404, detail="Session not found.")
+    session = DeviceAuthSession(**session_data)
 
     svc = SsoService(region=session.region)
     try:
         creds = svc.get_credentials(token, body.account_id, body.role_name)
-        svc.save_profile(
-            profile_name=body.profile_name,
-            credentials=creds,
-            region=session.region,
-            start_url=session.start_url,
-            account_id=body.account_id,
-            role_name=body.role_name,
-        )
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    # Bust the boto3 session cache so subsequent requests use the new credentials
-    reset_session_cache()
+    is_lambda = os.environ.get("LAMBDA_RUNTIME") == "1"
 
-    # Clean up session memory
-    _sessions.pop(body.session_id, None)
-    _tokens.pop(body.session_id, None)
+    if is_lambda:
+        # Store credentials in session_store; return credential_id to the frontend.
+        credential_id = body.session_id
+        put_session(
+            f"creds:{credential_id}",
+            {
+                "access_key_id": creds.access_key_id,
+                "secret_access_key": creds.secret_access_key,
+                "session_token": creds.session_token,
+                "expiration": creds.expiration,
+                "region": session.region,
+            },
+            ttl_seconds=3600,
+        )
+        message = (
+            f"Credentials stored for Lambda session '{body.profile_name}'. "
+            f"Expires: {creds.expiration}"
+        )
+    else:
+        try:
+            svc.save_profile(
+                profile_name=body.profile_name,
+                credentials=creds,
+                region=session.region,
+                start_url=session.start_url,
+                account_id=body.account_id,
+                role_name=body.role_name,
+            )
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        # Bust the boto3 session cache so subsequent requests use the new credentials
+        reset_session_cache()
+        credential_id = None
+        message = (
+            f"Credentials saved as profile '{body.profile_name}'. "
+            f"Expires: {creds.expiration}"
+        )
+
+    # Clean up device-auth session data (credentials are stored separately)
+    delete_session(body.session_id)
+    delete_token(body.session_id)
 
     return SsoSelectRoleResponse(
         profile_name=body.profile_name,
         expiration=creds.expiration,
-        message=(
-            f"Credentials saved as profile '{body.profile_name}'. "
-            f"Expires: {creds.expiration}"
-        ),
+        credential_id=credential_id,
+        message=message,
     )

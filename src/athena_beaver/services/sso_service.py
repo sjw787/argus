@@ -183,7 +183,15 @@ class SsoService:
         account_id: str,
         role_name: str,
     ) -> None:
-        """Write credentials + config to ~/.aws/credentials and ~/.aws/config."""
+        """Write credentials + config to ~/.aws/credentials and ~/.aws/config.
+
+        When running on Lambda (LAMBDA_RUNTIME=1) file writes are skipped — the
+        caller is responsible for storing credentials in the session_store.
+        """
+        import os as _os
+        if _os.environ.get("LAMBDA_RUNTIME") == "1":
+            return
+
         aws_dir = Path.home() / ".aws"
         aws_dir.mkdir(mode=0o700, exist_ok=True)
 

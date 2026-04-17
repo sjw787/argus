@@ -1,0 +1,12 @@
+**/__pycache__
+**/*.pyc
+**/*.pyo
+frontend/node_modules
+frontend/.next
+venv/
+.git/
+.gitignore
+tests/
+*.md
+athena_beaver.yaml
+query_*.csv
