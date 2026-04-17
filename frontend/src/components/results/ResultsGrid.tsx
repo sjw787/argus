@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { AgGridReact } from 'ag-grid-react'
-import type { ColDef } from 'ag-grid-community'
+import type { ColDef, GridApi, CellContextMenuEvent } from 'ag-grid-community'
 import { api } from '../../api/client'
-import { Download, Ban } from 'lucide-react'
+import { Download, Ban, Filter } from 'lucide-react'
 import { useThemeStore } from '../../stores/themeStore'
 
 interface Props {
@@ -15,9 +15,48 @@ interface Props {
   onCancel?: () => void
 }
 
+interface CellMenu {
+  x: number
+  y: number
+  colId: string
+  value: string | null
+}
+
 export function ResultsGrid({ queryExecutionId, queryState, queryError, limitApplied, autoLimit, onCancel }: Props) {
   const [isExporting, setIsExporting] = useState(false)
+  const [cellMenu, setCellMenu] = useState<CellMenu | null>(null)
+  const gridApiRef = useRef<GridApi | null>(null)
   const gridTheme = useThemeStore(s => s.theme === 'light' ? 'ag-theme-balham' : 'ag-theme-balham-dark')
+
+  // Close context menu on outside click
+  useEffect(() => {
+    if (!cellMenu) return
+    const close = () => setCellMenu(null)
+    window.addEventListener('click', close)
+    window.addEventListener('contextmenu', close)
+    return () => { window.removeEventListener('click', close); window.removeEventListener('contextmenu', close) }
+  }, [cellMenu])
+
+  const handleCellContextMenu = useCallback((e: CellContextMenuEvent) => {
+    const evt = e.event as MouseEvent
+    evt.preventDefault()
+    setCellMenu({
+      x: evt.clientX,
+      y: evt.clientY,
+      colId: e.column.getColId(),
+      value: e.value ?? null,
+    })
+  }, [])
+
+  const applyFilter = useCallback(() => {
+    if (!cellMenu || !gridApiRef.current) return
+    gridApiRef.current.setColumnFilterModel(cellMenu.colId, {
+      filterType: 'text',
+      type: 'equals',
+      filter: cellMenu.value ?? '',
+    }).then(() => gridApiRef.current!.onFilterChanged())
+    setCellMenu(null)
+  }, [cellMenu])
 
   const { data: results, isFetching } = useQuery({
     queryKey: ['queryResults', queryExecutionId],
@@ -152,9 +191,45 @@ export function ResultsGrid({ queryExecutionId, queryState, queryError, limitApp
             suppressMovableColumns={false}
             enableCellTextSelection
             suppressRowClickSelection
+            onGridReady={e => { gridApiRef.current = e.api }}
+            onCellContextMenu={handleCellContextMenu}
+            preventDefaultOnContextMenu
           />
         </div>
       </div>
+
+      {cellMenu && (
+        <div
+          style={{
+            position: 'fixed',
+            top: cellMenu.y,
+            left: cellMenu.x,
+            zIndex: 9999,
+            background: 'var(--bg-panel)',
+            border: '1px solid var(--border)',
+            borderRadius: 6,
+            boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+            minWidth: 200,
+            padding: '3px 0',
+          }}
+          onClick={e => e.stopPropagation()}
+        >
+          <button
+            onClick={applyFilter}
+            className="flex items-center gap-2 w-full px-3 py-2 text-xs text-left"
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-primary)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent)')}
+            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+          >
+            <Filter size={12} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+            <span>
+              Filter by <strong style={{ fontFamily: 'monospace' }}>
+                {cellMenu.value === null ? 'NULL' : cellMenu.value.length > 40 ? cellMenu.value.slice(0, 40) + '…' : cellMenu.value}
+              </strong>
+            </span>
+          </button>
+        </div>
+      )}
     </div>
   )
 }
