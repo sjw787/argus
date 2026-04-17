@@ -7,7 +7,7 @@ import uuid
 from pathlib import Path
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel
 
 from argus.api.schemas import (
@@ -69,11 +69,31 @@ def get_auth_status(
     config: Annotated[AppConfig, Depends(get_config)],
     profile: Optional[str] = None,
     region: Optional[str] = None,
+    x_credential_id: Optional[str] = Header(default=None),
 ):
-    """Check whether valid AWS credentials are available."""
-    resolved_profile = profile or config.aws.profile
+    """Check whether valid AWS credentials are available.
+
+    In Lambda/SSO mode the frontend sends X-Credential-Id on every request.
+    We validate against the DynamoDB session store first so that a page refresh
+    does not force a full re-login.
+    """
     resolved_region = region or config.aws.region
     profiles = SsoService.list_profiles()
+
+    # Fast path: credential stored in session store (Lambda SSO mode)
+    if x_credential_id:
+        creds_data = get_session(f"creds:{x_credential_id}")
+        if creds_data:
+            resolved_profile = creds_data.get("profile") or profile or config.aws.profile
+            return AuthStatusResponse(
+                authenticated=True,
+                profile=resolved_profile,
+                region=resolved_region,
+                profiles=profiles,
+            )
+
+    # Fallback: check local AWS profile credentials (local dev mode)
+    resolved_profile = profile or config.aws.profile
     authenticated = SsoService.check_credentials(profile=resolved_profile, region=resolved_region)
     return AuthStatusResponse(
         authenticated=authenticated,
