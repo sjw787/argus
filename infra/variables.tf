@@ -65,3 +65,15 @@ variable "output_location" {
   type        = string
   default     = ""
 }
+
+variable "sso_start_url" {
+  description = "AWS IAM Identity Center SSO start URL (e.g. https://samwylock.awsapps.com/start)"
+  type        = string
+  default     = ""
+}
+
+variable "manage_sso" {
+  description = "When true, Terraform manages IAM Identity Center permission sets and account assignments. Requires 052869941234 to be registered as SSO delegated administrator."
+  type        = bool
+  default     = false
+}

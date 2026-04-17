@@ -124,6 +124,7 @@ jobs:
           TF_VAR_create_hosted_zone: "true"
           TF_VAR_output_location: ${{ secrets.ATHENA_OUTPUT_LOCATION }}
           TF_VAR_aws_region: ${{ env.AWS_REGION }}
+          TF_VAR_sso_start_url: ${{ secrets.SSO_START_URL }}
         run: |
           # When skipping builds, resolve image URI from ECR :latest
           if [ -z "${IMAGE_URI}" ]; then

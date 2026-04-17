@@ -3,13 +3,14 @@ locals {
   effective_image_uri = var.image_uri != "" ? var.image_uri : "${aws_ecr_repository.app.repository_url}:latest"
 
   lambda_env_base = {
-    ARGUS_REGION        = var.aws_region
-    ARGUS_AUTH_MODE     = var.auth_mode
-    ARGUS_SESSION_STORE = "dynamodb"
-    ARGUS_SESSION_TABLE = aws_dynamodb_table.sessions.name
-    LAMBDA_RUNTIME   = "1"
+    ARGUS_REGION          = var.aws_region
+    ARGUS_AUTH_MODE       = var.auth_mode
+    ARGUS_SESSION_STORE   = "dynamodb"
+    ARGUS_SESSION_TABLE   = aws_dynamodb_table.sessions.name
+    LAMBDA_RUNTIME        = "1"
     ARGUS_OUTPUT_LOCATION = var.output_location
-    ARGUS_CORS_ORIGINS  = "https://${var.domain_name}"
+    ARGUS_CORS_ORIGINS    = "https://${var.domain_name}"
+    ARGUS_SSO_START_URL   = var.sso_start_url
   }
 
   lambda_env_cognito = var.auth_mode == "cognito" ? {

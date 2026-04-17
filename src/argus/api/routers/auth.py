@@ -111,10 +111,17 @@ def list_profiles():
 
 @router.get("/sso-config", response_model=SsoConfigResponse)
 def get_sso_config(config: Annotated[AppConfig, Depends(get_config)]):
-    """Read the SSO start URL and region for the active profile from ~/.aws/config."""
-    profile = config.aws.profile
+    """Read the SSO start URL and region for the active profile from ~/.aws/config.
+    In Lambda mode, ARGUS_SSO_START_URL env var takes precedence.
+    """
     region = config.aws.region
 
+    # Lambda mode: return env-configured start URL directly
+    env_start_url = os.environ.get("ARGUS_SSO_START_URL")
+    if env_start_url:
+        return SsoConfigResponse(start_url=env_start_url, region=region)
+
+    profile = config.aws.profile
     if not profile:
         return SsoConfigResponse(region=region)
 
