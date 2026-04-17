@@ -1,5 +1,5 @@
 resource "aws_s3_bucket" "frontend" {
-  bucket = "athena-beaver-${replace(var.domain_name, ".", "-")}-frontend"
+  bucket = "argus-for-athena-${replace(var.domain_name, ".", "-")}-frontend"
 }
 
 resource "aws_s3_bucket_public_access_block" "frontend" {
@@ -31,8 +31,8 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "frontend" {
 
 # CloudFront Origin Access Control (OAC) — modern replacement for OAI
 resource "aws_cloudfront_origin_access_control" "frontend" {
-  name                              = "athena-beaver-frontend-${var.environment}"
-  description                       = "OAC for AthenaBeaver frontend S3 bucket"
+  name                              = "argus-for-athena-frontend-${var.environment}"
+  description                       = "OAC for Argus for Athena frontend S3 bucket"
   origin_access_control_origin_type = "s3"
   signing_behavior                  = "always"
   signing_protocol                  = "sigv4"

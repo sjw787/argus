@@ -7,7 +7,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.syntax import Syntax
 
-from athena_beaver.core.config import load_config, reset_config_cache
+from argus.core.config import load_config, reset_config_cache
 
 config_app = typer.Typer(no_args_is_help=True)
 console = Console()
@@ -44,7 +44,7 @@ def config_validate(
 
 @config_app.command("init")
 def config_init(
-    output: Annotated[Path, typer.Option("--output", "-o")] = Path("athena_beaver.yaml"),
+    output: Annotated[Path, typer.Option("--output", "-o")] = Path("argus.yaml"),
 ):
     """Generate an example configuration file."""
     if output.exists():

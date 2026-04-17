@@ -3,7 +3,7 @@
 resource "aws_route53_zone" "app" {
   count   = var.create_hosted_zone ? 1 : 0
   name    = var.domain_name
-  comment = "Managed by Terraform — AthenaBeaver ${var.environment}"
+  comment = "Managed by Terraform — Argus for Athena ${var.environment}"
 }
 
 locals {

@@ -5,9 +5,9 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
-from athena_beaver.api.schemas import ExportRequest
-from athena_beaver.api.dependencies import get_athena_service
-from athena_beaver.services.athena_service import AthenaService
+from argus.api.schemas import ExportRequest
+from argus.api.dependencies import get_athena_service
+from argus.services.athena_service import AthenaService
 
 router = APIRouter(prefix="/export", tags=["export"])
 

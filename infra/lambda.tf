@@ -3,18 +3,18 @@ locals {
   effective_image_uri = var.image_uri != "" ? var.image_uri : "${aws_ecr_repository.app.repository_url}:latest"
 
   lambda_env_base = {
-    AB_REGION        = var.aws_region
-    AB_AUTH_MODE     = var.auth_mode
-    AB_SESSION_STORE = "dynamodb"
-    AB_SESSION_TABLE = aws_dynamodb_table.sessions.name
+    ARGUS_REGION        = var.aws_region
+    ARGUS_AUTH_MODE     = var.auth_mode
+    ARGUS_SESSION_STORE = "dynamodb"
+    ARGUS_SESSION_TABLE = aws_dynamodb_table.sessions.name
     LAMBDA_RUNTIME   = "1"
-    AB_OUTPUT_LOCATION = var.output_location
-    AB_CORS_ORIGINS  = "https://${var.domain_name}"
+    ARGUS_OUTPUT_LOCATION = var.output_location
+    ARGUS_CORS_ORIGINS  = "https://${var.domain_name}"
   }
 
   lambda_env_cognito = var.auth_mode == "cognito" ? {
-    AB_COGNITO_USER_POOL_ID = length(aws_cognito_user_pool.app) > 0 ? aws_cognito_user_pool.app[0].id : ""
-    AB_COGNITO_CLIENT_ID    = length(aws_cognito_user_pool_client.app) > 0 ? aws_cognito_user_pool_client.app[0].id : ""
+    ARGUS_COGNITO_USER_POOL_ID = length(aws_cognito_user_pool.app) > 0 ? aws_cognito_user_pool.app[0].id : ""
+    ARGUS_COGNITO_CLIENT_ID    = length(aws_cognito_user_pool_client.app) > 0 ? aws_cognito_user_pool_client.app[0].id : ""
   } : {}
 
   lambda_env = merge(local.lambda_env_base, local.lambda_env_cognito)
@@ -22,7 +22,7 @@ locals {
 
 # IAM role for Lambda
 resource "aws_iam_role" "lambda" {
-  name = "athena-beaver-lambda-${var.environment}"
+  name = "argus-for-athena-lambda-${var.environment}"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -47,7 +47,7 @@ resource "aws_iam_role_policy_attachment" "lambda_athena" {
 }
 
 resource "aws_iam_role_policy" "lambda_custom" {
-  name = "athena-beaver-lambda-custom-${var.environment}"
+  name = "argus-for-athena-lambda-custom-${var.environment}"
   role = aws_iam_role.lambda.id
 
   policy = jsonencode({
@@ -116,7 +116,7 @@ resource "aws_iam_role_policy" "lambda_custom" {
 }
 
 resource "aws_lambda_function" "app" {
-  function_name = "athena-beaver-${var.environment}"
+  function_name = "argus-for-athena-${var.environment}"
   role          = aws_iam_role.lambda.arn
   package_type  = "Image"
   image_uri     = local.effective_image_uri

@@ -5,13 +5,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from botocore.exceptions import ClientError
 
-from athena_beaver.api.schemas import (
+from argus.api.schemas import (
     WorkgroupItem, WorkgroupCreate, WorkgroupUpdate, WorkgroupResolveResult, TagItem,
 )
-from athena_beaver.api.dependencies import get_workgroup_service, get_config, get_s3
-from athena_beaver.services.workgroup_service import WorkgroupService
-from athena_beaver.models.schemas import AppConfig
-from athena_beaver.core.naming import get_resolver
+from argus.api.dependencies import get_workgroup_service, get_config, get_s3
+from argus.services.workgroup_service import WorkgroupService
+from argus.models.schemas import AppConfig
+from argus.core.naming import get_resolver
 
 router = APIRouter(prefix="/workgroups", tags=["workgroups"])
 
@@ -66,7 +66,7 @@ def validate_s3_location(
         return S3ValidateResponse(valid=False, bucket=bucket, error=str(e))
 
     # 2. Verify write permission by attempting a zero-byte put then deleting it
-    probe_key = f"{prefix}_athena_beaver_write_check"
+    probe_key = f"{prefix}_argus_write_check"
     try:
         s3.put_object(Bucket=bucket, Key=probe_key, Body=b"")
         s3.delete_object(Bucket=bucket, Key=probe_key)

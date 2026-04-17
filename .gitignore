@@ -24,7 +24,7 @@ htmlcov/
 .tox/
 
 # App config (contains real AWS/S3 details — commit only .example)
-athena_beaver.yaml
+argus.yaml
 
 # Query result exports
 *.csv

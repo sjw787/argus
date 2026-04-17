@@ -1,8 +1,8 @@
 from __future__ import annotations
 import time
 from typing import Optional, Any
-from athena_beaver.models.schemas import AppConfig
-from athena_beaver.core.naming import get_resolver
+from argus.models.schemas import AppConfig
+from argus.core.naming import get_resolver
 
 
 class AthenaService:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 import pytest
-from athena_beaver.models.schemas import AppConfig, NamingSchema, AWSConfig, WorkgroupConfig, DefaultsConfig
+from argus.models.schemas import AppConfig, NamingSchema, AWSConfig, WorkgroupConfig, DefaultsConfig
 
 
 @pytest.fixture

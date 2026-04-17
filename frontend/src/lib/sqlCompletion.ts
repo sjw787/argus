@@ -1,5 +1,5 @@
 /**
- * Monaco SQL completion provider for AthenaBeaver.
+ * Monaco SQL completion provider for Argus for Athena.
  * Registers once globally; dynamically resolves tables/columns from the active database.
  */
 import type * as Monaco from 'monaco-editor'

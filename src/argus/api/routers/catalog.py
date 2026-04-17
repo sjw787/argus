@@ -4,15 +4,15 @@ from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from athena_beaver.api.schemas import (
+from argus.api.schemas import (
     DatabaseItem, DatabaseCreate, TableItem, TableSummary,
     ColumnItem, PartitionItem, ErDiagramData, ErNode, ErEdge,
 )
-from athena_beaver.api.dependencies import get_catalog_service, get_config, get_athena_service
-from athena_beaver.services.catalog_service import CatalogService
-from athena_beaver.services.athena_service import AthenaService
-from athena_beaver.models.schemas import AppConfig
-from athena_beaver.core.naming import get_resolver
+from argus.api.dependencies import get_catalog_service, get_config, get_athena_service
+from argus.services.catalog_service import CatalogService
+from argus.services.athena_service import AthenaService
+from argus.models.schemas import AppConfig
+from argus.core.naming import get_resolver
 
 router = APIRouter(prefix="/catalog", tags=["catalog"])
 

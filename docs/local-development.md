@@ -1,6 +1,6 @@
 # Local Development Guide
 
-This guide walks you through setting up and running AthenaBeaver locally for development.
+This guide walks you through setting up and running Argus for Athena locally for development.
 
 ---
 
@@ -23,8 +23,8 @@ You also need an AWS account with access to Athena and the Glue catalog, plus an
 ### 1. Clone the repository
 
 ```bash
-git clone git@github.com:sjw787/AthenaBeaver.git
-cd AthenaBeaver
+git clone git@github.com:sjw787/ArgusForAthena.git
+cd Argus for Athena
 ```
 
 ### 2. Set up the Python virtual environment
@@ -54,10 +54,10 @@ npm --prefix frontend install
 ### 4. Create your config file
 
 ```bash
-cp athena_beaver.yaml.example athena_beaver.yaml
+cp argus.yaml.example argus.yaml
 ```
 
-Edit `athena_beaver.yaml`. At minimum you need:
+Edit `argus.yaml`. At minimum you need:
 
 ```yaml
 aws:
@@ -73,14 +73,14 @@ See the [Configuration Reference](#configuration-reference) below for all option
 
 ## Configuration Reference
 
-AthenaBeaver looks for config in this order:
+Argus for Athena looks for config in this order:
 
-1. `./athena_beaver.yaml` (repo root — recommended for development)
-2. `~/.athena_beaver.yaml` (user home — useful for shared installs)
-3. Environment variable `ATHENA_BEAVER_CONFIG` (JSON string of the full config)
+1. `./argus.yaml` (repo root — recommended for development)
+2. `~/.argus.yaml` (user home — useful for shared installs)
+3. Environment variable `ARGUS_CONFIG` (JSON string of the full config)
 4. Individual `AB_*` environment variables (see below)
 
-### Full `athena_beaver.yaml` reference
+### Full `argus.yaml` reference
 
 ```yaml
 aws:
@@ -124,11 +124,11 @@ locked_settings: []
 
 | Variable | Equivalent config key | Example |
 |----------|-----------------------|---------|
-| `AB_REGION` | `aws.region` | `us-west-2` |
-| `AB_PROFILE` | `aws.profile` | `my-profile` |
-| `AB_OUTPUT_LOCATION` | `defaults.output_location` | `s3://bucket/path/` |
-| `AB_AUTH_MODE` | `auth_mode` | `none` |
-| `ATHENA_BEAVER_CONFIG` | entire config as JSON | `'{"aws":{"region":"us-east-1"}}'` |
+| `ARGUS_REGION` | `aws.region` | `us-west-2` |
+| `ARGUS_PROFILE` | `aws.profile` | `my-profile` |
+| `ARGUS_OUTPUT_LOCATION` | `defaults.output_location` | `s3://bucket/path/` |
+| `ARGUS_AUTH_MODE` | `auth_mode` | `none` |
+| `ARGUS_CONFIG` | entire config as JSON | `'{"aws":{"region":"us-east-1"}}'` |
 
 ---
 
@@ -152,7 +152,7 @@ locked_settings: []
 
 ```bash
 source venv/bin/activate
-PYTHONPATH=src uvicorn "athena_beaver.api.app:create_app" \
+PYTHONPATH=src uvicorn "argus.api.app:create_app" \
   --factory \
   --host 127.0.0.1 \
   --port 8000 \
@@ -214,7 +214,7 @@ npm run test:watch  # watch mode with vitest
 **Symptom:** `NoCredentialError` or `Unable to locate credentials` in the backend logs.
 
 **Fix:**
-- For SSO: run `aws sso login --profile your-profile` and set `profile: your-profile` in `athena_beaver.yaml`.
+- For SSO: run `aws sso login --profile your-profile` and set `profile: your-profile` in `argus.yaml`.
 - For access keys: ensure `~/.aws/credentials` has a `[default]` or named profile.
 - Verify with: `aws sts get-caller-identity --region us-east-1`
 
@@ -233,17 +233,17 @@ kill <PID>
 
 Or change the port by editing the `--port` flag in `start.sh` or your manual command.
 
-### `athena_beaver.yaml` missing
+### `argus.yaml` missing
 
 **Symptom:** Backend starts with defaults — no output location set, queries fail with `InvalidRequestException` from Athena.
 
 **Fix:** Copy the example and fill in your S3 bucket:
 ```bash
-cp athena_beaver.yaml.example athena_beaver.yaml
+cp argus.yaml.example argus.yaml
 # Edit defaults.output_location
 ```
 
-### `ModuleNotFoundError: No module named 'athena_beaver'`
+### `ModuleNotFoundError: No module named 'argus'`
 
 **Symptom:** Seen when running uvicorn or pytest directly without setting `PYTHONPATH`.
 
@@ -289,7 +289,7 @@ With the backend running in dev mode, interactive API docs are available at:
 npm --prefix frontend run build
 ```
 
-This outputs to `src/athena_beaver/api/static/`, where FastAPI picks it up automatically in prod mode.
+This outputs to `src/argus/api/static/`, where FastAPI picks it up automatically in prod mode.
 
 ---
 
@@ -298,7 +298,7 @@ This outputs to `src/athena_beaver/api/static/`, where FastAPI picks it up autom
 ### Key directories
 
 ```
-src/athena_beaver/
+src/argus/
 ├── api/
 │   ├── app.py              # FastAPI app factory (create_app)
 │   ├── routers/            # Route handlers: auth, catalog, queries, workgroups, config, export
@@ -331,11 +331,11 @@ With `auth_mode: sso` (default):
 
 With `auth_mode: none` (no-auth mode for local dev without SSO):
 - The backend uses the ambient AWS credentials (profile or environment variables) directly.
-- No login page is shown. Set this in `athena_beaver.yaml` if you just want to use your CLI credentials.
+- No login page is shown. Set this in `argus.yaml` if you just want to use your CLI credentials.
 
 ### Frontend ↔ Backend communication
 
 - All API calls go through `/api/*` on the same origin.
 - In dev mode, Vite proxies `/api` → `http://localhost:8000` (configured in `frontend/vite.config.ts`).
-- In prod mode, FastAPI serves the built frontend from `src/athena_beaver/api/static/` and handles `/api` routes natively.
+- In prod mode, FastAPI serves the built frontend from `src/argus/api/static/` and handles `/api` routes natively.
 - Long-running query status is streamed via Server-Sent Events (`sse-starlette`).

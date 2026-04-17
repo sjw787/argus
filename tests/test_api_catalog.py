@@ -3,9 +3,9 @@ import pytest
 from unittest.mock import MagicMock
 from fastapi.testclient import TestClient
 
-from athena_beaver.api.app import create_app
-from athena_beaver.api.dependencies import get_catalog_service, get_config
-from athena_beaver.models.schemas import AppConfig
+from argus.api.app import create_app
+from argus.api.dependencies import get_catalog_service, get_config
+from argus.models.schemas import AppConfig
 
 
 @pytest.fixture

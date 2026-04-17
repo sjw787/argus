@@ -1,16 +1,16 @@
 # Agent Instructions
 
-This file provides instructions for AI agents (GitHub Copilot, Claude, etc.) working on the AthenaBeaver project. Follow these guidelines to maintain code quality and keep project documentation accurate as the codebase evolves.
+This file provides instructions for AI agents (GitHub Copilot, Claude, etc.) working on the Argus for Athena project. Follow these guidelines to maintain code quality and keep project documentation accurate as the codebase evolves.
 
 ---
 
 ## Project Overview
 
-AthenaBeaver is a browser-based DBMS for AWS Athena. It has a **FastAPI backend** and a **React/TypeScript frontend**, deployable locally or on AWS Lambda + CloudFront. The codebase was initially generated entirely by AI and is maintained with continued AI assistance.
+Argus for Athena is a browser-based DBMS for AWS Athena. It has a **FastAPI backend** and a **React/TypeScript frontend**, deployable locally or on AWS Lambda + CloudFront. The codebase was initially generated entirely by AI and is maintained with continued AI assistance.
 
 Key directories:
 ```
-src/athena_beaver/   — Python backend (FastAPI)
+src/argus/   — Python backend (FastAPI)
   api/routers/       — HTTP route handlers
   services/          — AWS SDK business logic (Athena, Glue, SSO)
   core/              — Config, auth, session store
@@ -32,7 +32,7 @@ docs/                — Markdown guides
 
 ### Always run the test suite after making changes
 ```bash
-cd /path/to/AthenaBeaver
+cd /path/to/Argus for Athena
 source venv/bin/activate
 PYTHONPATH=src python -m pytest tests/ -q
 ```
@@ -45,10 +45,10 @@ The application is a pass-through to AWS APIs. Query results, schema data, and S
 All sensitive values (AWS credentials, API keys, Cognito pool IDs) must come from environment variables or AWS-managed secrets. Never hardcode them.
 
 ### Keep CORS locked down
-Do not change CORS to allow all origins (`*`). The `AB_CORS_ORIGINS` env var is the correct mechanism.
+Do not change CORS to allow all origins (`*`). The `ARGUS_CORS_ORIGINS` env var is the correct mechanism.
 
 ### Prefer env vars over config file changes
-Runtime behaviour should be controlled via environment variables (see `src/athena_beaver/core/config.py`). The `athena_beaver.yaml` config file is for user preferences only.
+Runtime behaviour should be controlled via environment variables (see `src/argus/core/config.py`). The `argus.yaml` config file is for user preferences only.
 
 ---
 

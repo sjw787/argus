@@ -47,13 +47,13 @@ export const useThemeStore = create<ThemeStore>()(
       setAutoLimit: (autoLimit) => set({ autoLimit }),
       setFormatStyle: (formatStyle) => set({ formatStyle }),
     }),
-    { name: 'athena-beaver-theme' }
+    { name: 'argus-theme' }
   )
 )
 
 /** Call once on app init to apply the persisted theme before first render. */
 export function applyPersistedTheme() {
-  const stored = localStorage.getItem('athena-beaver-theme')
+  const stored = localStorage.getItem('argus-theme')
   if (stored) {
     try {
       const { state } = JSON.parse(stored)

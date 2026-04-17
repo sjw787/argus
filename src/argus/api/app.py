@@ -12,10 +12,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from athena_beaver.api.routers import queries, catalog, workgroups
-from athena_beaver.api.routers import config as config_router
-from athena_beaver.api.routers import export, auth
-from athena_beaver.api.dependencies import set_config_path
+from argus.api.routers import queries, catalog, workgroups
+from argus.api.routers import config as config_router
+from argus.api.routers import export, auth
+from argus.api.dependencies import set_config_path
 
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -51,7 +51,7 @@ def create_app(config_path: Optional[Path] = None) -> FastAPI:
     set_config_path(config_path)
 
     app = FastAPI(
-        title="AthenaBeaver API",
+        title="Argus for Athena API",
         description="AWS Athena DBMS — REST API",
         version="0.1.0",
         lifespan=lifespan,
@@ -95,7 +95,7 @@ def create_app(config_path: Optional[Path] = None) -> FastAPI:
         "http://127.0.0.1:5173",
         "http://localhost:3000",
     ]
-    _cors_env = os.environ.get("AB_CORS_ORIGINS", "")
+    _cors_env = os.environ.get("ARGUS_CORS_ORIGINS", "")
     if _cors_env:
         cors_origins = [o.strip() for o in _cors_env.split(",") if o.strip()]
     elif os.environ.get("LAMBDA_RUNTIME"):

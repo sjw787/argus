@@ -4,7 +4,7 @@ Use this mode for internal/VPN-only deployments where authentication is handled 
 
 ## Configuration
 
-Set `AB_AUTH_MODE=none` in your Lambda environment variables (or `athena_beaver.yaml` for local dev).
+Set `ARGUS_AUTH_MODE=none` in your Lambda environment variables (or `argus.yaml` for local dev).
 
 The Lambda function's IAM execution role must have permissions for Athena, Glue, and S3.
 

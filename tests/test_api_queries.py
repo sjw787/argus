@@ -3,9 +3,9 @@ import pytest
 from unittest.mock import MagicMock
 from fastapi.testclient import TestClient
 
-from athena_beaver.api.app import create_app
-from athena_beaver.api.dependencies import get_athena_service, get_config
-from athena_beaver.models.schemas import AppConfig
+from argus.api.app import create_app
+from argus.api.dependencies import get_athena_service, get_config
+from argus.models.schemas import AppConfig
 
 
 @pytest.fixture
@@ -131,7 +131,7 @@ def test_execute_query_error(client, mock_athena_svc):
 # ---------------------------------------------------------------------------
 # Unit tests for auto-limit helpers
 # ---------------------------------------------------------------------------
-from athena_beaver.api.routers.queries import _has_top_level_limit, _apply_auto_limit
+from argus.api.routers.queries import _has_top_level_limit, _apply_auto_limit
 
 class TestHasTopLevelLimit:
     def test_simple_limit(self):

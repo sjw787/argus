@@ -1,7 +1,7 @@
 """
 Session store with DynamoDB backend for Lambda and in-memory fallback for local dev.
-Controlled by AB_SESSION_STORE env var: 'dynamodb' | 'memory' (default: 'memory')
-DynamoDB table: athena-beaver-sessions, PK=session_id, TTL on expires_at field.
+Controlled by ARGUS_SESSION_STORE env var: 'dynamodb' | 'memory' (default: 'memory')
+DynamoDB table: argus-sessions, PK=session_id, TTL on expires_at field.
 """
 from __future__ import annotations
 
@@ -18,12 +18,12 @@ _memory_store: dict[str, dict] = {}
 
 
 def _use_dynamodb() -> bool:
-    return os.environ.get("AB_SESSION_STORE", "memory") == "dynamodb"
+    return os.environ.get("ARGUS_SESSION_STORE", "memory") == "dynamodb"
 
 
 def _get_table():
     import boto3
-    table_name = os.environ.get("AB_SESSION_TABLE", "athena-beaver-sessions")
+    table_name = os.environ.get("ARGUS_SESSION_TABLE", "argus-sessions")
     ddb = boto3.resource("dynamodb")
     return ddb.Table(table_name)
 

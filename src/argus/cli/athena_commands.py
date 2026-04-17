@@ -6,9 +6,9 @@ from rich.console import Console
 from rich.table import Table
 from rich import print as rprint
 
-from athena_beaver.core.config import load_config, reset_config_cache
-from athena_beaver.core.auth import get_athena_client
-from athena_beaver.services.athena_service import AthenaService
+from argus.core.config import load_config, reset_config_cache
+from argus.core.auth import get_athena_client
+from argus.services.athena_service import AthenaService
 
 query_app = typer.Typer(no_args_is_help=True)
 console = Console()

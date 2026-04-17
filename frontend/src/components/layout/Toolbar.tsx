@@ -21,7 +21,7 @@ export function Toolbar() {
         <div className="flex items-center gap-2">
           <Database size={18} style={{ color: 'var(--accent)' }} />
           <span className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>
-            AthenaBeaver
+            Argus for Athena
           </span>
         </div>
         <div className="flex items-center gap-4 text-xs" style={{ color: 'var(--text-muted)' }}>

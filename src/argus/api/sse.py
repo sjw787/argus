@@ -2,7 +2,7 @@ from __future__ import annotations
 import asyncio
 import json
 from typing import AsyncGenerator
-from athena_beaver.services.athena_service import AthenaService
+from argus.services.athena_service import AthenaService
 
 
 async def query_status_stream(

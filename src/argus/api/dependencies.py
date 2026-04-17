@@ -9,18 +9,18 @@ import boto3
 from fastapi import Depends, Header, HTTPException, Query, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from athena_beaver.core.config import load_config
-from athena_beaver.core.auth import (
+from argus.core.config import load_config
+from argus.core.auth import (
     get_athena_client,
     get_glue_client,
     get_s3_client,
     get_session_from_credentials,
 )
-from athena_beaver.core.session_store import get_session as get_stored_session
-from athena_beaver.models.schemas import AppConfig
-from athena_beaver.services.athena_service import AthenaService
-from athena_beaver.services.catalog_service import CatalogService
-from athena_beaver.services.workgroup_service import WorkgroupService
+from argus.core.session_store import get_session as get_stored_session
+from argus.models.schemas import AppConfig
+from argus.services.athena_service import AthenaService
+from argus.services.catalog_service import CatalogService
+from argus.services.workgroup_service import WorkgroupService
 
 logger = logging.getLogger(__name__)
 
@@ -47,9 +47,9 @@ def _validate_cognito_token(token: str) -> dict:
     except ImportError as exc:
         raise HTTPException(status_code=500, detail="PyJWT not installed.") from exc
 
-    region = os.environ.get("AB_REGION", "us-east-1")
-    user_pool_id = os.environ.get("AB_COGNITO_USER_POOL_ID", "")
-    client_id = os.environ.get("AB_COGNITO_CLIENT_ID", "")
+    region = os.environ.get("ARGUS_REGION", "us-east-1")
+    user_pool_id = os.environ.get("ARGUS_COGNITO_USER_POOL_ID", "")
+    client_id = os.environ.get("ARGUS_COGNITO_CLIENT_ID", "")
 
     if not user_pool_id or not client_id:
         raise HTTPException(status_code=500, detail="Cognito env vars not configured.")
@@ -90,8 +90,8 @@ def get_current_user(
     bearer: Annotated[Optional[HTTPAuthorizationCredentials], Depends(_http_bearer)] = None,
     x_credential_id: Annotated[Optional[str], Header()] = None,
 ) -> dict:
-    """Return current user identity. Behaviour is controlled by AB_AUTH_MODE."""
-    auth_mode = os.environ.get("AB_AUTH_MODE", "sso")
+    """Return current user identity. Behaviour is controlled by ARGUS_AUTH_MODE."""
+    auth_mode = os.environ.get("ARGUS_AUTH_MODE", "sso")
 
     if auth_mode == "none":
         return {"user": "system", "auth_mode": "none"}
@@ -130,7 +130,7 @@ def _boto3_session_from_credential_id(
         try:
             expiry_dt = datetime.fromisoformat(expiration.replace("Z", "+00:00"))
             if datetime.now(timezone.utc) >= expiry_dt:
-                from athena_beaver.core.session_store import delete_session
+                from argus.core.session_store import delete_session
                 delete_session(f"creds:{credential_id}")
                 return None
         except ValueError:

@@ -57,7 +57,7 @@ class SsoCredentials:
 class SsoService:
     """Orchestrates the SSO OIDC device-authorization login flow."""
 
-    _CLIENT_NAME = "athena-beaver"
+    _CLIENT_NAME = "argus-for-athena"
     _CLIENT_TYPE = "public"
 
     def __init__(self, region: str) -> None:

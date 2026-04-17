@@ -1,6 +1,6 @@
 resource "aws_cognito_user_pool" "app" {
   count = var.auth_mode == "cognito" ? 1 : 0
-  name  = "athena-beaver-${var.environment}"
+  name  = "argus-for-athena-${var.environment}"
 
   username_attributes      = ["email"]
   auto_verified_attributes = ["email"]
@@ -38,14 +38,14 @@ resource "aws_cognito_user_pool" "app" {
   }
 
   tags = {
-    Name = "athena-beaver-${var.environment}"
+    Name = "argus-for-athena-${var.environment}"
   }
 }
 
 # SPA client — no client secret
 resource "aws_cognito_user_pool_client" "app" {
   count        = var.auth_mode == "cognito" ? 1 : 0
-  name         = "athena-beaver-spa-${var.environment}"
+  name         = "argus-for-athena-spa-${var.environment}"
   user_pool_id = aws_cognito_user_pool.app[0].id
 
   generate_secret                      = false
@@ -73,6 +73,6 @@ resource "aws_cognito_user_pool_client" "app" {
 
 resource "aws_cognito_user_pool_domain" "app" {
   count        = var.auth_mode == "cognito" ? 1 : 0
-  domain       = "athena-beaver-${var.environment}"
+  domain       = "argus-for-athena-${var.environment}"
   user_pool_id = aws_cognito_user_pool.app[0].id
 }

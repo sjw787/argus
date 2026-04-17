@@ -5,13 +5,13 @@ import os
 from pathlib import Path
 from typing import Optional
 import yaml
-from athena_beaver.models.schemas import AppConfig
+from argus.models.schemas import AppConfig
 
 log = logging.getLogger(__name__)
 
 _SEARCH_PATHS = [
-    Path("athena_beaver.yaml"),
-    Path.home() / ".athena_beaver.yaml",
+    Path("argus.yaml"),
+    Path.home() / ".argus.yaml",
 ]
 
 _config_cache: Optional[AppConfig] = None
@@ -20,29 +20,29 @@ _active_config_path: Optional[Path] = None
 
 def _load_from_env() -> Optional[AppConfig]:
     """Try to build AppConfig from environment variables. Returns None if no env vars set."""
-    full_json = os.environ.get("ATHENA_BEAVER_CONFIG")
+    full_json = os.environ.get("ARGUS_CONFIG")
     if full_json:
         return AppConfig.model_validate(json.loads(full_json))
 
     individual = {
-        "AB_REGION": os.environ.get("AB_REGION"),
-        "AB_PROFILE": os.environ.get("AB_PROFILE"),
-        "AB_OUTPUT_LOCATION": os.environ.get("AB_OUTPUT_LOCATION"),
-        "AB_AUTH_MODE": os.environ.get("AB_AUTH_MODE"),
-        "AB_SESSION_STORE": os.environ.get("AB_SESSION_STORE"),
+        "ARGUS_REGION": os.environ.get("ARGUS_REGION"),
+        "ARGUS_PROFILE": os.environ.get("ARGUS_PROFILE"),
+        "ARGUS_OUTPUT_LOCATION": os.environ.get("ARGUS_OUTPUT_LOCATION"),
+        "ARGUS_AUTH_MODE": os.environ.get("ARGUS_AUTH_MODE"),
+        "ARGUS_SESSION_STORE": os.environ.get("ARGUS_SESSION_STORE"),
     }
     if not any(individual.values()):
         return None
 
     cfg = AppConfig()
-    if individual["AB_REGION"]:
-        cfg.aws.region = individual["AB_REGION"]
-    if individual["AB_PROFILE"]:
-        cfg.aws.profile = individual["AB_PROFILE"]
-    if individual["AB_OUTPUT_LOCATION"]:
-        cfg.defaults.output_location = individual["AB_OUTPUT_LOCATION"]
-    if individual["AB_AUTH_MODE"]:
-        cfg.auth_mode = individual["AB_AUTH_MODE"]
+    if individual["ARGUS_REGION"]:
+        cfg.aws.region = individual["ARGUS_REGION"]
+    if individual["ARGUS_PROFILE"]:
+        cfg.aws.profile = individual["ARGUS_PROFILE"]
+    if individual["ARGUS_OUTPUT_LOCATION"]:
+        cfg.defaults.output_location = individual["ARGUS_OUTPUT_LOCATION"]
+    if individual["ARGUS_AUTH_MODE"]:
+        cfg.auth_mode = individual["ARGUS_AUTH_MODE"]
     return cfg
 
 
@@ -80,7 +80,7 @@ def save_config(config: AppConfig, config_path: Optional[Path] = None) -> None:
 
     path = config_path or _active_config_path or _resolve_config_path(None)
     if path is None:
-        path = Path("athena_beaver.yaml")
+        path = Path("argus.yaml")
 
     raw = config.model_dump(exclude_none=True)
     with open(path, "w") as f:

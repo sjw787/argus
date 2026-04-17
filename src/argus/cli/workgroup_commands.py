@@ -5,10 +5,10 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from athena_beaver.core.config import load_config, reset_config_cache
-from athena_beaver.core.auth import get_athena_client
-from athena_beaver.core.naming import get_resolver
-from athena_beaver.services.workgroup_service import WorkgroupService
+from argus.core.config import load_config, reset_config_cache
+from argus.core.auth import get_athena_client
+from argus.core.naming import get_resolver
+from argus.services.workgroup_service import WorkgroupService
 
 workgroup_app = typer.Typer(no_args_is_help=True)
 console = Console()

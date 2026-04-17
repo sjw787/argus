@@ -1,6 +1,6 @@
 # AWS SSO Authentication Mode
 
-The default authentication mode for AthenaBeaver. Users sign in via AWS SSO (IAM Identity Center).
+The default authentication mode for Argus for Athena. Users sign in via AWS SSO (IAM Identity Center).
 
 ## How It Works
 1. User clicks "Sign in with AWS SSO"
@@ -11,19 +11,19 @@ The default authentication mode for AthenaBeaver. Users sign in via AWS SSO (IAM
 6. All Athena/Glue API calls use these per-user credentials
 
 ## Configuration
-- `AB_AUTH_MODE=sso` (default)
-- `AB_SESSION_STORE=dynamodb` (required for Lambda, optional for local dev)
-- `AB_REGION=us-east-1` (or your AWS region)
+- `ARGUS_AUTH_MODE=sso` (default)
+- `ARGUS_SESSION_STORE=dynamodb` (required for Lambda, optional for local dev)
+- `ARGUS_REGION=us-east-1` (or your AWS region)
 
 ## Local Development
 No special setup needed — uses the existing SSO flow with in-memory session store.
 
 After completing the SSO flow, credentials are written to `~/.aws/credentials` as a named
-profile (e.g. `athena-beaver`). Subsequent requests use that profile via boto3's standard
+profile (e.g. `argus-for-athena`). Subsequent requests use that profile via boto3's standard
 credential chain.
 
 ## Lambda Deployment
-Set `AB_SESSION_STORE=dynamodb` and ensure the Lambda IAM role has DynamoDB permissions for
+Set `ARGUS_SESSION_STORE=dynamodb` and ensure the Lambda IAM role has DynamoDB permissions for
 the sessions table. The SSO credentials are returned to the browser and sent with each request,
 so the Lambda doesn't need to write to `~/.aws/credentials`.
 
@@ -42,7 +42,7 @@ so the Lambda doesn't need to write to `~/.aws/credentials`.
 9. Backend retrieves credentials from DynamoDB and creates a per-request boto3 session
 
 ### DynamoDB Sessions Table
-The table `athena-beaver-sessions` (configurable via `AB_SESSION_TABLE`) stores:
+The table `argus-sessions` (configurable via `ARGUS_SESSION_TABLE`) stores:
 - Device-auth sessions (`session_id`) — TTL: 10 minutes
 - SSO access tokens (`token:{session_id}`) — TTL: 1 hour
 - Role credentials (`creds:{session_id}`) — TTL: 1 hour

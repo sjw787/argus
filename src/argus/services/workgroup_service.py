@@ -1,6 +1,6 @@
 from __future__ import annotations
 from typing import Optional, Any
-from athena_beaver.models.schemas import AppConfig
+from argus.models.schemas import AppConfig
 
 
 class WorkgroupService:

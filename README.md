@@ -1,4 +1,4 @@
-# AthenaBeaver 🦫
+# Argus for Athena 🦫
 
 A browser-based database manager for **AWS Athena** — inspired by DBeaver. Browse schemas, write and execute SQL, view results, and manage workgroups from a clean web UI. Runs locally or deployed to AWS Lambda + CloudFront.
 
@@ -80,8 +80,8 @@ See [`docs/deployment.md`](docs/deployment.md) for the full deployment guide.
 ### 1. Clone and install
 
 ```bash
-git clone git@github.com:sjw787/AthenaBeaver.git
-cd AthenaBeaver
+git clone git@github.com:sjw787/ArgusForAthena.git
+cd Argus for Athena
 
 python3 -m venv venv
 source venv/bin/activate
@@ -92,10 +92,10 @@ npm --prefix frontend install
 ### 2. Configure
 
 ```bash
-cp athena_beaver.yaml.example athena_beaver.yaml
+cp argus.yaml.example argus.yaml
 ```
 
-Edit `athena_beaver.yaml` — at minimum set your AWS region and S3 output location:
+Edit `argus.yaml` — at minimum set your AWS region and S3 output location:
 
 ```yaml
 aws:
@@ -122,21 +122,21 @@ See [`docs/local-development.md`](docs/local-development.md) for the full local 
 
 ## Configuration Reference
 
-AthenaBeaver looks for config in this order: env vars → `./athena_beaver.yaml` → `~/.athena_beaver.yaml`
+Argus for Athena looks for config in this order: env vars → `./argus.yaml` → `~/.argus.yaml`
 
 ### Key environment variables (Lambda / hosted)
 
 | Variable | Description |
 |---|---|
-| `AB_AUTH_MODE` | `sso` (default) \| `cognito` \| `none` |
-| `AB_REGION` | AWS region |
-| `AB_OUTPUT_LOCATION` | S3 URI for Athena query results |
-| `AB_CORS_ORIGINS` | Comma-separated allowed origins (default: `*` on Lambda) |
-| `AB_SESSION_STORE` | `memory` (default) \| `dynamodb` |
+| `ARGUS_AUTH_MODE` | `sso` (default) \| `cognito` \| `none` |
+| `ARGUS_REGION` | AWS region |
+| `ARGUS_OUTPUT_LOCATION` | S3 URI for Athena query results |
+| `ARGUS_CORS_ORIGINS` | Comma-separated allowed origins (default: `*` on Lambda) |
+| `ARGUS_SESSION_STORE` | `memory` (default) \| `dynamodb` |
 | `LAMBDA_RUNTIME` | Set to `1` when running on Lambda |
-| `ATHENA_BEAVER_CONFIG` | Full config as a JSON string (overrides YAML) |
+| `ARGUS_CONFIG` | Full config as a JSON string (overrides YAML) |
 
-### `athena_beaver.yaml`
+### `argus.yaml`
 
 ```yaml
 aws:
@@ -172,7 +172,7 @@ active_schema: default
 
 ### Workgroup routing
 
-If your databases follow a naming convention (e.g. `analytics_123456_prod`), AthenaBeaver automatically routes queries to the correct workgroup:
+If your databases follow a naming convention (e.g. `analytics_123456_prod`), Argus for Athena automatically routes queries to the correct workgroup:
 
 | Database | Resolved workgroup |
 |---|---|
@@ -185,7 +185,7 @@ If your databases follow a naming convention (e.g. `analytics_123456_prod`), Ath
 ## Project Layout
 
 ```
-src/athena_beaver/
+src/argus/
 ├── api/
 │   ├── routers/       # FastAPI route handlers (auth, catalog, queries, workgroups, config)
 │   ├── schemas.py     # API request/response models

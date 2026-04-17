@@ -1,6 +1,6 @@
 locals {
-  s3_origin_id      = "athena-beaver-s3-frontend"
-  apigw_origin_id   = "athena-beaver-apigw"
+  s3_origin_id      = "argus-for-athena-s3-frontend"
+  apigw_origin_id   = "argus-for-athena-apigw"
   # Strip the https:// scheme and trailing slash from the API GW URL
   apigw_domain_name = replace(replace(aws_apigatewayv2_stage.default.invoke_url, "https://", ""), "/", "")
 }
@@ -8,7 +8,7 @@ locals {
 resource "aws_cloudfront_distribution" "app" {
   enabled             = true
   is_ipv6_enabled     = true
-  comment             = "AthenaBeaver ${var.environment}"
+  comment             = "Argus for Athena ${var.environment}"
   default_root_object = "index.html"
   price_class         = "PriceClass_100"
   aliases             = [var.domain_name]

@@ -1,5 +1,5 @@
 resource "aws_ecr_repository" "app" {
-  name                 = "athena-beaver-${var.environment}"
+  name                 = "argus-for-athena-${var.environment}"
   image_tag_mutability = "MUTABLE"
 
   image_scanning_configuration {

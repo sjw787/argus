@@ -14,4 +14,4 @@ COPY src/ ./src/
 ENV PYTHONPATH=${LAMBDA_TASK_ROOT}/src
 
 # Lambda handler
-CMD ["athena_beaver.lambda_handler.handler"]
+CMD ["argus.lambda_handler.handler"]

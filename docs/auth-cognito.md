@@ -31,8 +31,8 @@ hosted_zone_id   = "ZXXXXXXXXXXXXX"
 output_location  = "s3://my-athena-results/prefix/"
 ```
 
-The Lambda environment variables `AB_AUTH_MODE`, `AB_COGNITO_USER_POOL_ID`, and
-`AB_COGNITO_CLIENT_ID` are set automatically by Terraform — no manual configuration needed.
+The Lambda environment variables `ARGUS_AUTH_MODE`, `ARGUS_COGNITO_USER_POOL_ID`, and
+`ARGUS_COGNITO_CLIENT_ID` are set automatically by Terraform — no manual configuration needed.
 
 ## Terraform Setup
 
@@ -52,7 +52,7 @@ terraform output cognito_domain
 ## Adding Users
 
 ### AWS Console
-1. Open **Cognito → User pools → athena-beaver-\<env\>**
+1. Open **Cognito → User pools → argus-for-athena-\<env\>**
 2. Click **Create user**
 3. Enter the user's email address and set a temporary password
 4. The user will be prompted to change their password on first login

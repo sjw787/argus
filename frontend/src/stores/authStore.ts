@@ -34,7 +34,7 @@ export const useAuthStore = create<AuthStore>()(
       clear: () => set({ authenticated: false, profile: null, region: null, credentialId: null, sessionExpired: false, lastAuthTime: 0 }),
     }),
     {
-      name: 'athena-beaver-auth',
+      name: 'argus-auth',
       partialize: (state) => ({
         authenticated: state.authenticated,
         profile: state.profile,

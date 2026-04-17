@@ -4,13 +4,13 @@ from typing import Optional
 import typer
 from rich.console import Console
 
-from athena_beaver.cli.athena_commands import query_app
-from athena_beaver.cli.catalog_commands import catalog_app
-from athena_beaver.cli.workgroup_commands import workgroup_app
-from athena_beaver.cli.config_commands import config_app
+from argus.cli.athena_commands import query_app
+from argus.cli.catalog_commands import catalog_app
+from argus.cli.workgroup_commands import workgroup_app
+from argus.cli.config_commands import config_app
 
 app = typer.Typer(
-    name="athena-beaver",
+    name="argus",
     help="AWS Athena DBMS CLI with automatic workgroup routing",
     no_args_is_help=True,
 )
@@ -30,9 +30,9 @@ def launch_ui(
     open_browser: bool = typer.Option(True, "--open/--no-open", help="Auto-open browser"),
     dev: bool = typer.Option(False, "--dev", help="Enable hot reload (dev mode)"),
 ):
-    """Launch the AthenaBeaver web UI."""
-    from athena_beaver.api.app import run_server
-    console.print(f"[green]Starting AthenaBeaver UI at http://{host}:{port}[/green]")
+    """Launch the Argus for Athena web UI."""
+    from argus.api.app import run_server
+    console.print(f"[green]Starting Argus for Athena UI at http://{host}:{port}[/green]")
     run_server(host=host, port=port, config_path=config, open_browser=open_browser, reload=dev)
 
 

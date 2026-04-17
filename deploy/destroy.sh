@@ -3,7 +3,7 @@ set -euo pipefail
 
 ENVIRONMENT="${1:-prod}"
 
-echo "WARNING: This will destroy ALL AthenaBeaver infrastructure for environment: ${ENVIRONMENT}"
+echo "WARNING: This will destroy ALL Argus for Athena infrastructure for environment: ${ENVIRONMENT}"
 echo "Type 'yes' to confirm:"
 read -r CONFIRM
 

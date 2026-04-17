@@ -3,10 +3,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from athena_beaver.api.schemas import ConfigInfo, NamingSchemaInfo
-from athena_beaver.api.dependencies import get_config
-from athena_beaver.models.schemas import AppConfig
-from athena_beaver.core.config import save_config
+from argus.api.schemas import ConfigInfo, NamingSchemaInfo
+from argus.api.dependencies import get_config
+from argus.models.schemas import AppConfig
+from argus.core.config import save_config
 
 router = APIRouter(prefix="/config", tags=["config"])
 

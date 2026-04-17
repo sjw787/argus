@@ -22,7 +22,7 @@ export const useQueryNamesStore = create<QueryNamesStore>()(
         set(state => ({ descriptions: { ...state.descriptions, [queryExecutionId]: description } })),
       getDescription: (queryExecutionId) => get().descriptions[queryExecutionId],
     }),
-    { name: 'athena-beaver-query-names' }
+    { name: 'argus-query-names' }
   )
 )
 

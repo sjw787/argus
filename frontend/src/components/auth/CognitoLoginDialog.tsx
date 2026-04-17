@@ -17,7 +17,7 @@ export function CognitoLoginDialog({ config }: Props) {
   return (
     <div className="fixed inset-0 flex items-center justify-center" style={{ background: 'var(--bg-primary)' }}>
       <div className="rounded-lg p-8 flex flex-col items-center gap-4" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
-        <h1 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>AthenaBeaver</h1>
+        <h1 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>Argus for Athena</h1>
         <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Sign in to continue</p>
         <a
           href={loginUrl}

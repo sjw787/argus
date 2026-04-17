@@ -1,4 +1,4 @@
-name: Destroy AthenaBeaver
+name: Destroy Argus for Athena
 
 on:
   workflow_dispatch:

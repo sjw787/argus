@@ -2,8 +2,8 @@ from __future__ import annotations
 import pytest
 import yaml
 from pathlib import Path
-from athena_beaver.core.config import load_config, reset_config_cache
-from athena_beaver.models.schemas import AppConfig
+from argus.core.config import load_config, reset_config_cache
+from argus.models.schemas import AppConfig
 
 
 @pytest.fixture(autouse=True)

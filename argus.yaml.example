@@ -1,5 +1,5 @@
 # AthenaBeaver Configuration
-# Copy this to athena_beaver.yaml (or ~/.athena_beaver.yaml) and customize.
+# Copy this to argus.yaml (or ~/.argus.yaml) and customize.
 
 aws:
   region: us-east-1

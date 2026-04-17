@@ -1,8 +1,8 @@
 from __future__ import annotations
 import pytest
 from unittest.mock import MagicMock
-from athena_beaver.services.catalog_service import CatalogService
-from athena_beaver.models.schemas import AppConfig, NamingSchema
+from argus.services.catalog_service import CatalogService
+from argus.models.schemas import AppConfig, NamingSchema
 
 
 @pytest.fixture

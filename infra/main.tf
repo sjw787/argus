@@ -13,7 +13,7 @@ terraform {
   # Uncomment to use S3 backend (replace with your values):
   # backend "s3" {
   #   bucket = "your-terraform-state-bucket"
-  #   key    = "athena-beaver/terraform.tfstate"
+  #   key    = "argus-for-athena/terraform.tfstate"
   #   region = "us-east-1"
   # }
 }
@@ -23,7 +23,7 @@ provider "aws" {
 
   default_tags {
     tags = {
-      Project     = "athena-beaver"
+      Project     = "argus-for-athena"
       Environment = var.environment
       ManagedBy   = "terraform"
     }
@@ -37,7 +37,7 @@ provider "aws" {
 
   default_tags {
     tags = {
-      Project     = "athena-beaver"
+      Project     = "argus-for-athena"
       Environment = var.environment
       ManagedBy   = "terraform"
     }

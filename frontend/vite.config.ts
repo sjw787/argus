@@ -14,7 +14,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: '../src/athena_beaver/api/static',
+    outDir: '../src/argus/api/static',
     emptyOutDir: true,
   },
   test: {

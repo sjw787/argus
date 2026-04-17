@@ -1,12 +1,12 @@
 # Privacy & Data Disclosure
 
-AthenaBeaver is a pass-through interface to your AWS Athena environment. This document explains exactly what data the application does and does not handle.
+Argus for Athena is a pass-through interface to your AWS Athena environment. This document explains exactly what data the application does and does not handle.
 
 ---
 
 ## What We Do Not Collect
 
-AthenaBeaver **never** captures, stores, logs, or transmits any of the following:
+Argus for Athena **never** captures, stores, logs, or transmits any of the following:
 
 - **Query results** — data returned by your Athena queries
 - **Query text** — the SQL statements you write and execute
@@ -20,7 +20,7 @@ AthenaBeaver **never** captures, stores, logs, or transmits any of the following
 ## How Your Data Flows
 
 ```
-Your Browser → AthenaBeaver Backend → AWS Athena API → Back to Your Browser
+Your Browser → Argus for Athena Backend → AWS Athena API → Back to Your Browser
 ```
 
 Query results travel entirely in-memory through the application and are discarded immediately after being delivered to your browser. Nothing is written to disk or a database at any point in this flow.
@@ -31,7 +31,7 @@ Query results travel entirely in-memory through the application and are discarde
 
 ## What Is Stored
 
-The only data AthenaBeaver persists is what is strictly necessary to maintain your authenticated session:
+The only data Argus for Athena persists is what is strictly necessary to maintain your authenticated session:
 
 | Data | Where Stored | Retention | Purpose |
 |------|-------------|-----------|---------|
@@ -53,13 +53,13 @@ All Athena data remains in your AWS account at all times:
 - **Named queries & prepared statements** — stored in AWS Athena (your account)
 - **Database and table definitions** — stored in AWS Glue Data Catalog (your account)
 
-AthenaBeaver reads from these services on your behalf using your credentials. It does not copy, cache, or replicate this data anywhere.
+Argus for Athena reads from these services on your behalf using your credentials. It does not copy, cache, or replicate this data anywhere.
 
 ---
 
 ## External Connections
 
-AthenaBeaver makes network requests **only** to:
+Argus for Athena makes network requests **only** to:
 
 - **AWS service endpoints** — Athena, Glue, S3, STS, and (if using SSO) IAM Identity Center
 - **AWS Cognito** — to validate JWTs when Cognito auth mode is enabled (fetches your pool's public signing keys)
@@ -70,13 +70,13 @@ No data is sent to any third-party service.
 
 ## No Telemetry
 
-AthenaBeaver contains no analytics scripts, usage tracking, error reporting services, or telemetry of any kind — in either the frontend or the backend.
+Argus for Athena contains no analytics scripts, usage tracking, error reporting services, or telemetry of any kind — in either the frontend or the backend.
 
 ---
 
 ## Administrator-Controlled Settings
 
-If your organization self-hosts AthenaBeaver, your administrator may configure:
+If your organization self-hosts Argus for Athena, your administrator may configure:
 
 - The authentication mode (Cognito, AWS SSO, or none)
 - Which AWS workgroups and regions are accessible
@@ -88,8 +88,8 @@ Contact your administrator for details specific to your deployment.
 
 ## Open Source
 
-AthenaBeaver is open source. You can inspect every line of code to verify these claims:  
-[https://github.com/sjw787/AthenaBeaver](https://github.com/sjw787/AthenaBeaver)
+Argus for Athena is open source. You can inspect every line of code to verify these claims:  
+[https://github.com/sjw787/ArgusForAthena](https://github.com/sjw787/ArgusForAthena)
 
 ---
 

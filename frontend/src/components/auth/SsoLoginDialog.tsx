@@ -38,7 +38,7 @@ export function SsoLoginDialog({ onAuthenticated, expired = false }: Props) {
   const [selectedAccount, setSelectedAccount] = useState<SsoAccount | null>(null)
   const [roles, setRoles] = useState<SsoRole[]>([])
   const [selectedRole, setSelectedRole] = useState<SsoRole | null>(null)
-  const [profileName, setProfileName] = useState(storedProfile ?? 'athena-beaver')
+  const [profileName, setProfileName] = useState(storedProfile ?? 'argus')
 
   const [step, setStep] = useState<Step>('entry')
   const [error, setError] = useState('')
@@ -431,7 +431,7 @@ export function SsoLoginDialog({ onAuthenticated, expired = false }: Props) {
             <div className="flex flex-col items-center py-4 gap-3">
               <CheckCircle size={36} style={{ color: 'var(--success)' }} />
               <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Signed in!</p>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Opening AthenaBeaver…</p>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Opening Argus for Athena…</p>
             </div>
           )}
 

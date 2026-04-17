@@ -10,7 +10,7 @@ from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from athena_beaver.api.schemas import (
+from argus.api.schemas import (
     AuthStatusResponse,
     AuthConfigResponse,
     ProfileSelectRequest,
@@ -22,9 +22,9 @@ from athena_beaver.api.schemas import (
     SsoStartRequest,
     SsoStartResponse,
 )
-from athena_beaver.api.dependencies import get_config
-from athena_beaver.core.auth import reset_session_cache
-from athena_beaver.core.session_store import (
+from argus.api.dependencies import get_config
+from argus.core.auth import reset_session_cache
+from argus.core.session_store import (
     delete_session,
     delete_token,
     get_session,
@@ -32,8 +32,8 @@ from athena_beaver.core.session_store import (
     put_session,
     put_token,
 )
-from athena_beaver.models.schemas import AppConfig
-from athena_beaver.services.sso_service import DeviceAuthSession, SsoService
+from argus.models.schemas import AppConfig
+from argus.services.sso_service import DeviceAuthSession, SsoService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -54,11 +54,11 @@ class AuthModeResponse(BaseModel):
 def get_auth_config():
     """Return frontend auth / feature configuration (no credentials required)."""
     return AuthConfigResponse(
-        mode=os.environ.get("AB_AUTH_MODE", "sso"),
+        mode=os.environ.get("ARGUS_AUTH_MODE", "sso"),
         streaming=os.environ.get("LAMBDA_RUNTIME", "") != "1",
-        cognito_user_pool_id=os.environ.get("AB_COGNITO_USER_POOL_ID") or None,
-        cognito_client_id=os.environ.get("AB_COGNITO_CLIENT_ID") or None,
-        cognito_domain=os.environ.get("AB_COGNITO_DOMAIN") or None,
+        cognito_user_pool_id=os.environ.get("ARGUS_COGNITO_USER_POOL_ID") or None,
+        cognito_client_id=os.environ.get("ARGUS_COGNITO_CLIENT_ID") or None,
+        cognito_domain=os.environ.get("ARGUS_COGNITO_DOMAIN") or None,
     )
 
 

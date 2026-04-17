@@ -96,7 +96,7 @@ export const useEditorStore = create<EditorStore>()(
       setPendingInsert: (text) => set({ pendingInsert: text }),
     }),
     {
-      name: 'athena-beaver-editor-tabs',
+      name: 'argus-editor-tabs',
       // Don't persist transient loading/error state — reset those on restore
       partialize: (state) => ({
         tabs: state.tabs.map(t => ({

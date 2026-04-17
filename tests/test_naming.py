@@ -1,7 +1,7 @@
 from __future__ import annotations
 import pytest
-from athena_beaver.core.naming import NamingResolver, _compile_pattern, get_resolver
-from athena_beaver.models.schemas import NamingSchema
+from argus.core.naming import NamingResolver, _compile_pattern, get_resolver
+from argus.models.schemas import NamingSchema
 
 
 @pytest.fixture
@@ -72,7 +72,7 @@ class TestNamingResolver:
 
 @pytest.fixture
 def sample_config():
-    from athena_beaver.models.schemas import AppConfig, NamingSchema, AWSConfig
+    from argus.models.schemas import AppConfig, NamingSchema, AWSConfig
     return AppConfig(
         aws=AWSConfig(region="us-east-1"),
         naming_schemas={

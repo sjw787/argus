@@ -306,7 +306,7 @@ export function SettingsModal({ onClose }: Props) {
                       ['Region', config.region],
                       ['Profile', config.profile ?? 'default'],
                       ['Active Schema', config.active_schema],
-                      ['Config file', 'athena_beaver.yaml'],
+                      ['Config file', 'argus.yaml'],
                     ].map(([label, value], i, arr) => (
                       <div
                         key={label}
@@ -331,7 +331,7 @@ export function SettingsModal({ onClose }: Props) {
           className="px-5 py-3 text-xs text-right flex-shrink-0"
           style={{ borderTop: '1px solid var(--border)', color: 'var(--text-muted)' }}
         >
-          AthenaBeaver
+          Argus for Athena
         </div>
       </div>
     </div>

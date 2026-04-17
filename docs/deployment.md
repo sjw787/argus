@@ -1,4 +1,4 @@
-# AthenaBeaver Deployment Guide
+# Argus for Athena Deployment Guide
 
 ## Prerequisites
 
@@ -65,7 +65,7 @@ This will:
 1. Build the React frontend (`npm run build -- --outDir dist`) → `frontend/dist/`
 2. Authenticate Docker with ECR
 3. Build the Lambda Docker image (`deploy/Dockerfile.backend`)
-4. Push to ECR as `athena-beaver-{environment}:latest` and `athena-beaver-{environment}:{git-sha}`
+4. Push to ECR as `argus-for-athena-{environment}:latest` and `argus-for-athena-{environment}:{git-sha}`
 5. Print the full image URI — **copy this for Step 2**
 
 ### Step 2 — Apply Terraform + sync frontend + invalidate CloudFront
@@ -74,7 +74,7 @@ This will:
 ./deploy/deploy.sh [environment] [hosted_zone_id] [output_location] [image_uri]
 
 # Example
-./deploy/deploy.sh prod Z1ABCDEFGHIJKL s3://my-athena-results/ 123456789012.dkr.ecr.us-east-1.amazonaws.com/athena-beaver-prod:abc1234
+./deploy/deploy.sh prod Z1ABCDEFGHIJKL s3://my-athena-results/ 123456789012.dkr.ecr.us-east-1.amazonaws.com/argus-for-athena-prod:abc1234
 ```
 
 This will:
@@ -124,7 +124,7 @@ Create an IAM role with a trust policy allowing your repository:
         "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
       },
       "StringLike": {
-        "token.actions.githubusercontent.com:sub": "repo:YOUR_ORG/AthenaBeaver:*"
+        "token.actions.githubusercontent.com:sub": "repo:YOUR_ORG/Argus for Athena:*"
       }
     }
   }]
@@ -134,11 +134,11 @@ Create an IAM role with a trust policy allowing your repository:
 ### Triggering a deploy
 
 - **Automatic**: push to `main` branch
-- **Manual**: Actions tab → "Deploy AthenaBeaver" → "Run workflow" → select environment
+- **Manual**: Actions tab → "Deploy Argus for Athena" → "Run workflow" → select environment
 
 ### Destroy (dev only)
 
-Actions tab → "Destroy AthenaBeaver" → "Run workflow" → select `dev` environment → type `destroy` to confirm.
+Actions tab → "Destroy Argus for Athena" → "Run workflow" → select `dev` environment → type `destroy` to confirm.
 
 > ⚠️ `prod` is excluded from the destroy workflow intentionally.
 
@@ -199,10 +199,10 @@ aws cloudfront create-invalidation --distribution-id "${CF_ID}" --paths "/*"
 
 ```bash
 # Tail live logs
-aws logs tail /aws/lambda/athena-beaver-prod --follow
+aws logs tail /aws/lambda/argus-for-athena-prod --follow
 
 # Last 100 lines
-aws logs tail /aws/lambda/athena-beaver-prod --since 1h
+aws logs tail /aws/lambda/argus-for-athena-prod --since 1h
 
 # Or via Lambda function name output
 FUNCTION=$(terraform -chdir=infra output -raw lambda_function_name)
@@ -217,17 +217,17 @@ aws logs tail "/aws/lambda/${FUNCTION}" --follow
 
 ```bash
 # List available image tags in ECR
-aws ecr list-images --repository-name athena-beaver-prod \
+aws ecr list-images --repository-name argus-for-athena-prod \
   --query 'imageIds[*].imageTag' --output table
 
 # Update Lambda to a specific image tag
 OLD_TAG="abc1234"  # git SHA of the working commit
 IMAGE_URI="$(aws ecr describe-repositories \
-  --repository-names athena-beaver-prod \
+  --repository-names argus-for-athena-prod \
   --query 'repositories[0].repositoryUri' --output text):${OLD_TAG}"
 
 aws lambda update-function-code \
-  --function-name athena-beaver-prod \
+  --function-name argus-for-athena-prod \
   --image-uri "${IMAGE_URI}"
 ```
 

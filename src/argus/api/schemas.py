@@ -273,7 +273,7 @@ class SsoSelectRoleRequest(BaseModel):
     session_id: str
     account_id: str
     role_name: str
-    profile_name: str = "athena-beaver"
+    profile_name: str = "argus"
 
 
 class SsoSelectRoleResponse(BaseModel):

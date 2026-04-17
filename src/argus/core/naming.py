@@ -1,7 +1,7 @@
 from __future__ import annotations
 import re
 from typing import Optional
-from athena_beaver.models.schemas import AppConfig, NamingSchema
+from argus.models.schemas import AppConfig, NamingSchema
 
 
 class NamingResolver:

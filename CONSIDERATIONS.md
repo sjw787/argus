@@ -1,6 +1,6 @@
 # Engineering Considerations
 
-AthenaBeaver was built entirely by AI (GitHub Copilot, powered by Claude Sonnet and Opus). This document exists to be transparent about the quality assurance steps taken to ensure the project is trustworthy, secure, and production-ready — despite being AI-generated.
+Argus for Athena was built entirely by AI (GitHub Copilot, powered by Claude Sonnet and Opus). This document exists to be transparent about the quality assurance steps taken to ensure the project is trustworthy, secure, and production-ready — despite being AI-generated.
 
 The premise: *AI can write the code, but a human still has to own the outcome.* These are the steps taken to do that.
 
@@ -70,7 +70,7 @@ Beyond the code review fixes, the following security practices are in place:
 - **Secrets**: No secrets are hardcoded. All sensitive values are environment variables or AWS-managed.
 - **Credentials at rest**: Temporary AWS credentials (Lambda/SSO mode) are stored in DynamoDB encrypted with a KMS CMK. TTL auto-expires entries.
 - **Transport**: HTTPS enforced end-to-end (CloudFront → API Gateway → Lambda). HTTP redirected to HTTPS at CloudFront.
-- **CORS**: Configurable via `AB_CORS_ORIGINS` env var — not open by default in Lambda mode.
+- **CORS**: Configurable via `ARGUS_CORS_ORIGINS` env var — not open by default in Lambda mode.
 - **Dependency scanning**: GitHub Actions CI runs on every push.
 
 ---

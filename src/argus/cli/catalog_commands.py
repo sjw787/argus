@@ -6,9 +6,9 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
-from athena_beaver.core.config import load_config, reset_config_cache
-from athena_beaver.core.auth import get_glue_client
-from athena_beaver.services.catalog_service import CatalogService
+from argus.core.config import load_config, reset_config_cache
+from argus.core.auth import get_glue_client
+from argus.services.catalog_service import CatalogService
 
 catalog_app = typer.Typer(no_args_is_help=True)
 console = Console()

@@ -5,17 +5,17 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sse_starlette.sse import EventSourceResponse
 
-from athena_beaver.api.schemas import (
+from argus.api.schemas import (
     ExecuteQueryRequest, ExecuteQueryResponse, QueryExecutionDetail,
     QueryStatus, QueryStats, QueryResults, ResultColumn, QueryListItem,
     NamedQueryCreate, NamedQueryItem, PreparedStatementCreate,
     PreparedStatementUpdate, PreparedStatementItem, QueryStatusSnapshot,
 )
-from athena_beaver.api.dependencies import get_athena_service, get_config
-from athena_beaver.api.sse import query_status_stream
-from athena_beaver.services.athena_service import AthenaService
-from athena_beaver.models.schemas import AppConfig
-from athena_beaver.core.naming import get_resolver
+from argus.api.dependencies import get_athena_service, get_config
+from argus.api.sse import query_status_stream
+from argus.services.athena_service import AthenaService
+from argus.models.schemas import AppConfig
+from argus.core.naming import get_resolver
 
 router = APIRouter(prefix="/queries", tags=["queries"])
 

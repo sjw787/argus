@@ -1,5 +1,5 @@
 resource "aws_apigatewayv2_api" "app" {
-  name          = "athena-beaver-${var.environment}"
+  name          = "argus-for-athena-${var.environment}"
   protocol_type = "HTTP"
 
   cors_configuration {
@@ -47,6 +47,6 @@ resource "aws_apigatewayv2_stage" "default" {
 }
 
 resource "aws_cloudwatch_log_group" "api_gateway" {
-  name              = "/aws/apigateway/athena-beaver-${var.environment}"
+  name              = "/aws/apigateway/argus-for-athena-${var.environment}"
   retention_in_days = 14
 }
