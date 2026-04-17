@@ -1,265 +1,215 @@
 # AthenaBeaver 🦫
 
-A local DBMS CLI for AWS Athena with **automatic workgroup routing** — query your Athena databases without ever manually specifying workgroups. AthenaBeaver uses configurable naming schemas to parse database names and automatically resolve the correct workgroup and S3 output location.
+A local, browser-based database manager for **AWS Athena** — inspired by DBeaver. Connect to your Athena databases via AWS SSO, browse schemas, write and execute SQL, and view results, all from a clean web UI running on your machine.
+
+---
 
 ## Features
 
-- 🎯 **Auto workgroup resolution** — extracts client IDs and environments from database names
-- 🔍 **Glue Data Catalog management** — browse databases, tables, and partitions
-- 🗂️ **Named queries & prepared statements** — full lifecycle management
-- 🏷️ **Workgroup tagging** — tag and untag Athena resources
-- 🔧 **Flexible configuration** — YAML config with multiple naming schemas
-- 🎨 **Rich terminal output** — beautiful tables powered by [Rich](https://github.com/Textualize/rich)
+### SQL Editor
+- Multi-tab editor with syntax highlighting (CodeMirror + Athena/Presto dialect)
+- SQL autocomplete — keywords, functions, table and column names from the active database
+- Real-time syntax diagnostics (600 ms delay)
+- Run multiple queries in one pane separated by `;` — executed in parallel
+- Run only the selected text
+- Format query (standard or compact style)
+- Auto-limit — appends `LIMIT N` to `SELECT` queries with no limit
+- Cancel running queries from the results pane or the Active Queries panel
+
+### Results
+- Paginated data grid with column sorting
+- Export to CSV, JSON, Excel, or Parquet
+- Query execution time and rows scanned
+- Per-query status: running, succeeded, failed, cancelled
+
+### Database Navigator
+- Browse all Glue catalog databases and tables
+- Lazy-loaded with server-side search — handles 500+ databases
+- Context menus: Select Top 100, copy table name, view DDL, ER diagram
+- Optional `information_schema` pinned at the top
+
+### ER Diagram
+- Visual entity-relationship diagram for any database
+- Interactive: zoom, pan, drag nodes
+
+### Query History & Active Queries
+- History panel: recent executions with status, duration, and query text
+- Active Queries panel: real-time view of running queries with cancel support
+
+### Authentication
+- AWS SSO login flow (browser-based device code)
+- Multi-account and multi-role support
+- Automatic session refresh detection
+
+### Workgroup Routing
+- Configurable naming schema: extracts client IDs and environments from database names
+- Automatically routes queries to the correct Athena workgroup and S3 output location
+- Manual overrides available per database
+
+### Settings
+- Dark / light theme
+- Toggle autocomplete, diagnostics, history panel, `information_schema`
+- Format style and auto-limit row count
+- Administrator-lockable settings (via `locked_settings` in config)
 
 ---
 
-## Installation
+## Requirements
+
+- Python 3.10+
+- Node.js 18+ (for building the frontend)
+- An AWS account with Athena and Glue access
+- AWS SSO configured, or a valid `~/.aws/credentials` profile
+
+---
+
+## Setup
+
+### 1. Clone and install
 
 ```bash
+git clone git@github.com:sjw787/AthenaBeaver.git
+cd AthenaBeaver
+
+python3 -m venv venv
+source venv/bin/activate
 pip install -e .
 ```
 
-For development (includes pytest, moto, pytest-mock):
+### 2. Configure
 
 ```bash
-pip install -e ".[dev]"
+cp athena_beaver.yaml.example athena_beaver.yaml
+```
+
+Edit `athena_beaver.yaml` — at minimum set your AWS region and S3 output location:
+
+```yaml
+aws:
+  region: us-east-1
+  profile: null  # null = default credential chain, or specify a named profile
+
+workgroups:
+  output_locations:
+    primary: s3://my-athena-results/default/
+
+defaults:
+  output_location: s3://my-athena-results/default/
+```
+
+### 3. Install frontend dependencies
+
+```bash
+npm --prefix frontend install
 ```
 
 ---
 
-## Quick Start
-
-### 1. Create a configuration file
+## Running
 
 ```bash
-athena-beaver config init
+# Production mode — FastAPI serves the built frontend on http://localhost:8000
+./start.sh
+
+# Development mode — Vite on :5173, FastAPI on :8000 with hot reload
+./start.sh dev
 ```
 
-This generates `athena_beaver.yaml` in the current directory. Edit it to match your setup.
-
-### 2. Validate your config
-
-```bash
-athena-beaver config validate
-```
-
-### 3. Run a query
-
-```bash
-athena-beaver query run "SELECT * FROM my_table LIMIT 10" --database analytics_123456_prod
-```
-
-AthenaBeaver automatically resolves the workgroup (`analytics_123456_prod`) and S3 output location from your config — no `--workgroup` flag needed.
-
-### 4. Preview workgroup resolution
-
-```bash
-athena-beaver workgroup resolve analytics_123456_prod
-# Database:          analytics_123456_prod
-# Parsed parts:      {'purpose': 'analytics', 'client_id': '123456', 'environment': 'prod'}
-# Resolved workgroup: analytics_123456_prod
-# S3 output:         s3://my-athena-results/123456/prod/
-```
+Open **http://localhost:8000** in your browser. You'll be prompted to sign in via AWS SSO on first launch.
 
 ---
 
 ## Configuration Reference
 
-AthenaBeaver searches for config in this order:
-1. `./athena_beaver.yaml` (current directory)
-2. `~/.athena_beaver.yaml` (home directory)
-
-You can always override with `--config /path/to/config.yaml`.
-
-### Full YAML schema
+AthenaBeaver looks for config in this order:
+1. `./athena_beaver.yaml`
+2. `~/.athena_beaver.yaml`
 
 ```yaml
 aws:
-  region: us-east-1          # AWS region (default: us-east-1)
-  profile: null              # AWS profile name (null = default credential chain)
-
-naming_schemas:
-  default:
-    description: "Human-readable description"
-    pattern: "{purpose}_{client_id}_{environment}"
-    # Fields in {braces} become named capture groups.
-    # 'client_id' uses client_id_regex; all others match [^_]+
-
-    client_id_regex: '\d{6}|\d{9}'
-    # Regex for the client_id field only. Supports alternation.
-
-    workgroup_pattern: "{purpose}_{client_id}_{environment}"
-    # Python str.format() template using the same field names.
-
-active_schema: default       # Which schema to use by default
+  region: us-east-1
+  profile: null                   # Named AWS profile, or null for default chain
 
 workgroups:
   output_locations:
-    # workgroup_name: s3://bucket/prefix/
-    analytics_123456_prod: "s3://my-results/123456/prod/"
-    analytics_123456_dev:  "s3://my-results/123456/dev/"
+    # Map workgroup name → S3 URI for query results
+    my-workgroup: s3://my-bucket/results/
 
 defaults:
-  output_location: "s3://my-results/default/"  # Fallback S3 location
+  output_location: s3://my-bucket/results/default/
   max_results: 100
   query_timeout_seconds: 300
-```
 
-### How naming schemas work
+# Optional: lock UI settings so users can't change them
+# locked_settings:
+#   - autoLimit
+#   - formatStyle
+# Valid keys: theme, sqlAutocomplete, sqlDiagnostics, showHistoryDefault,
+#             showInformationSchema, formatStyle, autoLimit
 
-Given `pattern: "{purpose}_{client_id}_{environment}"` and `client_id_regex: '\d{6}|\d{9}'`:
-
-| Database name | purpose | client_id | environment | Workgroup |
-|---|---|---|---|---|
-| `analytics_123456_prod` | analytics | 123456 | prod | `analytics_123456_prod` |
-| `reporting_123456789_dev` | reporting | 123456789 | dev | `reporting_123456789_dev` |
-| `bad_name` | — | — | — | *(no match → uses default)* |
-
----
-
-## CLI Reference
-
-All commands support `--config`, `--profile`, and `--region` overrides.
-
-### `athena-beaver query`
-
-| Command | Description |
-|---|---|
-| `query run <SQL> --database <db>` | Execute a SQL query (auto-resolves workgroup) |
-| `query status <query-id>` | Get query execution status and stats |
-| `query results <query-id>` | Fetch and display results |
-| `query cancel <query-id>` | Cancel a running query |
-| `query list` | List recent query executions |
-| `query named create <name>` | Create a named query |
-| `query named list` | List named queries |
-| `query named get <id>` | Get named query details |
-| `query named delete <id>` | Delete a named query |
-| `query prepared create <name>` | Create a prepared statement |
-| `query prepared list --workgroup <wg>` | List prepared statements |
-| `query prepared get <name> --workgroup <wg>` | Get a prepared statement |
-| `query prepared update <name> --workgroup <wg>` | Update a prepared statement |
-| `query prepared delete <name> --workgroup <wg>` | Delete a prepared statement |
-
-**`query run` options:**
-
-```
---database, -d    Target Athena database (required)
---workgroup, -w   Override auto-resolved workgroup
---output, -o      Override S3 output location
---wait/--no-wait  Wait for completion (default: --wait)
---results/--no-results  Show results table (default: --results)
---schema, -s      Use a specific naming schema
-```
-
-### `athena-beaver catalog`
-
-| Command | Description |
-|---|---|
-| `catalog databases list` | List all Glue databases |
-| `catalog databases get <name>` | Get database details |
-| `catalog databases create <name>` | Create a database |
-| `catalog databases delete <name>` | Delete a database |
-| `catalog search --client-id <id>` | Find all databases for a client |
-| `catalog tables list --database <db>` | List tables in a database |
-| `catalog tables get <name> --database <db>` | Get table schema |
-| `catalog tables delete <name> --database <db>` | Delete a table |
-| `catalog partitions list --database <db> --table <t>` | List partitions |
-
-### `athena-beaver workgroup`
-
-| Command | Description |
-|---|---|
-| `workgroup list` | List all workgroups |
-| `workgroup get <name>` | Get workgroup details |
-| `workgroup create <name>` | Create a workgroup |
-| `workgroup update <name>` | Update a workgroup |
-| `workgroup delete <name>` | Delete a workgroup |
-| `workgroup resolve <database>` | Preview workgroup resolution for a database name |
-| `workgroup tags list <arn>` | List tags for a resource |
-| `workgroup tags add <arn> KEY=VALUE ...` | Add tags |
-| `workgroup tags remove <arn> KEY ...` | Remove tags |
-
-### `athena-beaver config`
-
-| Command | Description |
-|---|---|
-| `config show` | Display current configuration |
-| `config validate` | Validate the configuration file |
-| `config init` | Generate an example `athena_beaver.yaml` |
-| `config schemas` | List configured naming schemas |
-
----
-
-## Examples
-
-### Automatic workgroup routing
-
-```bash
-# These databases match the default schema — no --workgroup needed:
-athena-beaver query run "SELECT count(*) FROM orders" --database analytics_123456_prod
-athena-beaver query run "SELECT * FROM users LIMIT 5" --database reporting_123456789_dev
-
-# Override when needed:
-athena-beaver query run "SELECT 1" --database mydb --workgroup my-custom-workgroup
-```
-
-### Find all databases for a client
-
-```bash
-athena-beaver catalog search --client-id 123456
-# Returns all databases whose client_id field is "123456"
-```
-
-### Multi-schema setup
-
-```yaml
+# Optional: auto-route databases to workgroups by name pattern
 naming_schemas:
-  standard:
+  default:
+    description: "Standard schema: <purpose>_<clientid>_<environment>"
     pattern: "{purpose}_{client_id}_{environment}"
     client_id_regex: '\d{6}|\d{9}'
     workgroup_pattern: "{purpose}_{client_id}_{environment}"
-  
-  legacy:
-    pattern: "{client_id}_{purpose}"
-    client_id_regex: '[a-z]{3}\d{4}'
-    workgroup_pattern: "wg_{client_id}"
 
-active_schema: standard
+active_schema: default
 ```
 
-```bash
-# Use the legacy schema for a specific query:
-athena-beaver query --schema legacy run "SELECT 1" --database abc1234_reports
-```
+### Workgroup routing
 
-### Preview resolution before running
+If your databases follow a naming convention (e.g. `analytics_123456_prod`), AthenaBeaver can automatically route queries to the right workgroup:
 
-```bash
-athena-beaver workgroup resolve analytics_123456_prod --schema standard
-```
+| Database | Resolved workgroup |
+|---|---|
+| `analytics_123456_prod` | `analytics_123456_prod` |
+| `reporting_789012_dev` | `reporting_789012_dev` |
+| `other_db` | *(default output location)* |
 
 ---
 
 ## Development
 
 ```bash
-# Install with dev dependencies
-pip install -e ".[dev]"
+# Run backend with hot reload + Vite dev server
+./start.sh dev
 
 # Run tests
+source venv/bin/activate
 pytest tests/ -v
 
-# Run a specific test file
-pytest tests/test_naming.py -v
+# Build frontend only
+npm --prefix frontend run build
 ```
 
 ### Project layout
 
 ```
 src/athena_beaver/
-├── cli/           # Typer CLI commands
-├── core/          # Config loading, naming resolution, AWS auth
-├── services/      # Athena, Glue, Workgroup service wrappers
-└── models/        # Pydantic schemas
-tests/             # pytest test suite
+├── api/
+│   ├── routers/       # FastAPI route handlers (auth, catalog, queries, workgroups, config)
+│   ├── schemas.py     # API request/response models
+│   └── app.py         # FastAPI app factory
+├── core/              # Auth (SSO), config loading, workgroup naming resolution
+├── models/            # Pydantic data models
+└── services/          # Athena, Glue, and Workgroup boto3 service wrappers
+
+frontend/src/
+├── api/               # Axios API client
+├── components/        # React UI components (editor, navigator, results, layout, auth)
+├── stores/            # Zustand state (auth, editor tabs, theme, UI)
+└── lib/               # CodeMirror SQL completion and diagnostics
+
+tests/                 # pytest suite
 ```
+
+---
+
+## API Docs
+
+When running in dev mode, interactive API docs are available at:
+- **Swagger UI**: http://localhost:8000/docs
+- **ReDoc**: http://localhost:8000/redoc
+
