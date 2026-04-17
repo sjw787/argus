@@ -247,7 +247,12 @@ jobs:
         env:
           IMAGE_URI: ${{ needs.build-and-push-docker.outputs.image_uri }}
           ENVIRONMENT: ${{ inputs.environment || 'prod' }}
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
         run: |
+          # Fallback to :latest if the build-and-push job didn't publish an output
+          if [ -z "${IMAGE_URI}" ]; then
+            IMAGE_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/argus-for-athena-${ENVIRONMENT}:latest"
+          fi
           aws lambda update-function-code \
             --function-name "argus-for-athena-${ENVIRONMENT}" \
             --image-uri "${IMAGE_URI}" \
