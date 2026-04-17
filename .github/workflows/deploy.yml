@@ -73,6 +73,12 @@ jobs:
           AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
         run: |
           ECR_REPO="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/argus-for-athena-${ENVIRONMENT}"
+          # Ensure ECR repo exists (Terraform may not have run yet on first deploy)
+          aws ecr create-repository \
+            --repository-name "argus-for-athena-${ENVIRONMENT}" \
+            --region "${AWS_REGION}" \
+            --image-scanning-configuration scanOnPush=true \
+            2>/dev/null || true
           docker build -f deploy/Dockerfile.backend -t "${ECR_REPO}:${IMAGE_TAG}" .
           docker push "${ECR_REPO}:${IMAGE_TAG}"
           echo "image_uri=${ECR_REPO}:${IMAGE_TAG}" >> $GITHUB_OUTPUT
@@ -107,6 +113,11 @@ jobs:
         run: |
           cd infra
           terraform init
+          # Import pre-existing ECR repo if not already in state
+          terraform import \
+            -var="environment=${ENVIRONMENT}" \
+            -var="image_uri=${IMAGE_URI}" \
+            aws_ecr_repository.app "argus-for-athena-${ENVIRONMENT}" 2>/dev/null || true
           terraform apply \
             -var="environment=${ENVIRONMENT}" \
             -var="image_uri=${IMAGE_URI}" \
