@@ -40,8 +40,8 @@ export function AppLayout() {
               </div>
               {!showHistory && (
                 <div
-                  className="flex items-center gap-2 px-3 shrink-0"
-                  style={{ height: 28, background: 'var(--bg-panel)', borderTop: '1px solid var(--border)', cursor: 'pointer' }}
+                  className="flex items-center gap-2 px-2 py-2 shrink-0"
+                  style={{ background: 'var(--bg-panel)', borderTop: '1px solid var(--border)', cursor: 'pointer' }}
                   onClick={() => setShowHistory(true)}
                   title="Show Query History"
                 >
