@@ -135,6 +135,7 @@ resource "aws_lambda_function" "app" {
     aws_iam_role_policy_attachment.lambda_basic,
     aws_iam_role_policy_attachment.lambda_athena,
     aws_iam_role_policy.lambda_custom,
+    aws_ecr_repository_policy.app,
   ]
 }
 
