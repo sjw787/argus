@@ -63,4 +63,5 @@ variable "lambda_timeout_seconds" {
 variable "output_location" {
   description = "S3 path for Athena query results (e.g. s3://my-bucket/athena-results/)"
   type        = string
+  default     = ""
 }

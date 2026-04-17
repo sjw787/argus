@@ -101,7 +101,7 @@ jobs:
         env:
           ENVIRONMENT: ${{ github.event.inputs.environment || 'prod' }}
           IMAGE_URI: ${{ needs.build-and-push-docker.outputs.image_uri }}
-          TF_VAR_hosted_zone_id: ${{ secrets.HOSTED_ZONE_ID }}
+          TF_VAR_create_hosted_zone: "true"
           TF_VAR_output_location: ${{ secrets.ATHENA_OUTPUT_LOCATION }}
           TF_VAR_aws_region: ${{ env.AWS_REGION }}
         run: |
@@ -115,6 +115,9 @@ jobs:
           CF_ID=$(terraform output -raw cloudfront_distribution_id)
           echo "S3_BUCKET=${S3_BUCKET}" >> $GITHUB_ENV
           echo "CF_ID=${CF_ID}" >> $GITHUB_ENV
+          echo "## Subdomain NS Records" >> $GITHUB_STEP_SUMMARY
+          echo "Add these NS records for \`abvr.samwylock.com\` in your parent hosted zone:" >> $GITHUB_STEP_SUMMARY
+          terraform output -json hosted_zone_name_servers | jq -r '.[]' | while read ns; do echo "- \`$ns\`"; done >> $GITHUB_STEP_SUMMARY || true
       - name: Sync frontend to S3
         run: |
           aws s3 sync frontend/dist/ "s3://${S3_BUCKET}/" \
