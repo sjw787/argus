@@ -1,6 +1,6 @@
 # AthenaBeaver 🦫
 
-A local, browser-based database manager for **AWS Athena** — inspired by DBeaver. Connect to your Athena databases via AWS SSO, browse schemas, write and execute SQL, and view results, all from a clean web UI running on your machine.
+A browser-based database manager for **AWS Athena** — inspired by DBeaver. Browse schemas, write and execute SQL, view results, and manage workgroups from a clean web UI. Runs locally or deployed to AWS Lambda + CloudFront.
 
 ---
 
@@ -37,9 +37,10 @@ A local, browser-based database manager for **AWS Athena** — inspired by DBeav
 - Active Queries panel: real-time view of running queries with cancel support
 
 ### Authentication
-- AWS SSO login flow (browser-based device code)
-- Multi-account and multi-role support
-- Automatic session refresh detection
+- **AWS SSO** — browser-based device code flow, multi-account and multi-role support
+- **Amazon Cognito** — JWT-based auth for hosted deployments, with hosted UI redirect
+- **No-auth / IAM-only** — for VPN-internal deployments where auth is handled at the network layer
+- Auth mode is runtime-configurable; the frontend adapts automatically
 
 ### Workgroup Routing
 - Configurable naming schema: extracts client IDs and environments from database names
@@ -54,16 +55,27 @@ A local, browser-based database manager for **AWS Athena** — inspired by DBeav
 
 ---
 
-## Requirements
+## Deployment Options
 
-- Python 3.10+
-- Node.js 18+ (for building the frontend)
-- An AWS account with Athena and Glue access
-- AWS SSO configured, or a valid `~/.aws/credentials` profile
+| Mode | Description |
+|---|---|
+| **Local** | FastAPI + Vite, runs on `localhost:8000`. No AWS infrastructure needed beyond Athena access. |
+| **Lambda + CloudFront** | Docker image on Lambda behind API Gateway, frontend on S3/CloudFront, custom domain via Route 53. Fully managed by Terraform. |
+
+See [`docs/deployment.md`](docs/deployment.md) for the full deployment guide.
 
 ---
 
-## Setup
+## Requirements
+
+- Python 3.12+
+- Node.js 20+
+- An AWS account with Athena and Glue access
+- AWS SSO configured, or a valid `~/.aws/credentials` profile (for local dev)
+
+---
+
+## Local Setup
 
 ### 1. Clone and install
 
@@ -74,6 +86,7 @@ cd AthenaBeaver
 python3 -m venv venv
 source venv/bin/activate
 pip install -e .
+npm --prefix frontend install
 ```
 
 ### 2. Configure
@@ -87,43 +100,43 @@ Edit `athena_beaver.yaml` — at minimum set your AWS region and S3 output locat
 ```yaml
 aws:
   region: us-east-1
-  profile: null  # null = default credential chain, or specify a named profile
-
-workgroups:
-  output_locations:
-    primary: s3://my-athena-results/default/
+  profile: null  # null = default credential chain
 
 defaults:
   output_location: s3://my-athena-results/default/
 ```
 
-### 3. Install frontend dependencies
+### 3. Run
 
 ```bash
-npm --prefix frontend install
-```
-
----
-
-## Running
-
-```bash
-# Production mode — FastAPI serves the built frontend on http://localhost:8000
+# Production mode — FastAPI serves the built frontend at http://localhost:8000
 ./start.sh
 
-# Development mode — Vite on :5173, FastAPI on :8000 with hot reload
+# Development mode — Vite HMR on :5173, FastAPI with hot reload on :8000
 ./start.sh dev
 ```
 
-Open **http://localhost:8000** in your browser. You'll be prompted to sign in via AWS SSO on first launch.
+See [`docs/local-development.md`](docs/local-development.md) for the full local dev guide.
 
 ---
 
 ## Configuration Reference
 
-AthenaBeaver looks for config in this order:
-1. `./athena_beaver.yaml`
-2. `~/.athena_beaver.yaml`
+AthenaBeaver looks for config in this order: env vars → `./athena_beaver.yaml` → `~/.athena_beaver.yaml`
+
+### Key environment variables (Lambda / hosted)
+
+| Variable | Description |
+|---|---|
+| `AB_AUTH_MODE` | `sso` (default) \| `cognito` \| `none` |
+| `AB_REGION` | AWS region |
+| `AB_OUTPUT_LOCATION` | S3 URI for Athena query results |
+| `AB_CORS_ORIGINS` | Comma-separated allowed origins (default: `*` on Lambda) |
+| `AB_SESSION_STORE` | `memory` (default) \| `dynamodb` |
+| `LAMBDA_RUNTIME` | Set to `1` when running on Lambda |
+| `ATHENA_BEAVER_CONFIG` | Full config as a JSON string (overrides YAML) |
+
+### `athena_beaver.yaml`
 
 ```yaml
 aws:
@@ -132,7 +145,6 @@ aws:
 
 workgroups:
   output_locations:
-    # Map workgroup name → S3 URI for query results
     my-workgroup: s3://my-bucket/results/
 
 defaults:
@@ -140,7 +152,7 @@ defaults:
   max_results: 100
   query_timeout_seconds: 300
 
-# Optional: lock UI settings so users can't change them
+# Optional: lock settings so users can't change them
 # locked_settings:
 #   - autoLimit
 #   - formatStyle
@@ -160,7 +172,7 @@ active_schema: default
 
 ### Workgroup routing
 
-If your databases follow a naming convention (e.g. `analytics_123456_prod`), AthenaBeaver can automatically route queries to the right workgroup:
+If your databases follow a naming convention (e.g. `analytics_123456_prod`), AthenaBeaver automatically routes queries to the correct workgroup:
 
 | Database | Resolved workgroup |
 |---|---|
@@ -170,46 +182,51 @@ If your databases follow a naming convention (e.g. `analytics_123456_prod`), Ath
 
 ---
 
-## Development
-
-```bash
-# Run backend with hot reload + Vite dev server
-./start.sh dev
-
-# Run tests
-source venv/bin/activate
-pytest tests/ -v
-
-# Build frontend only
-npm --prefix frontend run build
-```
-
-### Project layout
+## Project Layout
 
 ```
 src/athena_beaver/
 ├── api/
 │   ├── routers/       # FastAPI route handlers (auth, catalog, queries, workgroups, config)
 │   ├── schemas.py     # API request/response models
+│   ├── dependencies.py # Auth dependencies (Cognito JWT, SSO, no-auth)
 │   └── app.py         # FastAPI app factory
-├── core/              # Auth (SSO), config loading, workgroup naming resolution
+├── core/              # Config loading, auth, session store, workgroup naming
 ├── models/            # Pydantic data models
-└── services/          # Athena, Glue, and Workgroup boto3 service wrappers
+├── services/          # Athena, Glue, and Workgroup boto3 service wrappers
+└── lambda_handler.py  # Mangum entry point for Lambda
 
 frontend/src/
-├── api/               # Axios API client
-├── components/        # React UI components (editor, navigator, results, layout, auth)
+├── api/               # API client (axios)
+├── components/        # React UI (editor, navigator, results, layout, auth dialogs)
+├── hooks/             # useQueryStatus (SSE + polling fallback), useAuthConfig
 ├── stores/            # Zustand state (auth, editor tabs, theme, UI)
 └── lib/               # CodeMirror SQL completion and diagnostics
 
+infra/                 # Terraform — ECR, Lambda, API Gateway, S3, CloudFront, Route 53, ACM, DynamoDB, Cognito
+deploy/                # Dockerfile, build.sh, deploy.sh, destroy.sh
+.github/workflows/     # CI/CD (deploy.yml, destroy.yml)
+docs/                  # Deployment and auth guides
 tests/                 # pytest suite
 ```
 
 ---
 
+## Documentation
+
+| Doc | Description |
+|---|---|
+| [`docs/local-development.md`](docs/local-development.md) | Local dev setup, config reference, troubleshooting |
+| [`docs/deployment.md`](docs/deployment.md) | Lambda + CloudFront deployment guide |
+| [`docs/auth-sso.md`](docs/auth-sso.md) | AWS SSO auth mode |
+| [`docs/auth-cognito.md`](docs/auth-cognito.md) | Cognito auth mode |
+| [`docs/auth-none.md`](docs/auth-none.md) | No-auth / IAM-only mode |
+
+---
+
 ## API Docs
 
-When running in dev mode, interactive API docs are available at:
+Interactive API docs are available when running locally:
 - **Swagger UI**: http://localhost:8000/docs
 - **ReDoc**: http://localhost:8000/redoc
 
