@@ -1,9 +1,7 @@
 from __future__ import annotations
-import json
 import logging
 import os
-import time
-import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated, Optional
 
@@ -64,11 +62,13 @@ def _validate_cognito_token(token: str) -> dict:
     try:
         jwks_client = PyJWKClient(jwks_url, cache_keys=True, lifespan=86400)
         signing_key = jwks_client.get_signing_key_from_jwt(token)
+        issuer = f"https://cognito-idp.{region}.amazonaws.com/{user_pool_id}"
         payload = jwt.decode(
             token,
             signing_key.key,
             algorithms=["RS256"],
             audience=client_id,
+            issuer=issuer,
             options={"verify_exp": True},
         )
     except Exception as exc:  # PyJWTError, urllib errors, etc.
@@ -125,6 +125,16 @@ def _boto3_session_from_credential_id(
     creds_data = get_stored_session(f"creds:{credential_id}")
     if not creds_data:
         return None
+    expiration = creds_data.get("expiration")
+    if expiration:
+        try:
+            expiry_dt = datetime.fromisoformat(expiration.replace("Z", "+00:00"))
+            if datetime.now(timezone.utc) >= expiry_dt:
+                from athena_beaver.core.session_store import delete_session
+                delete_session(f"creds:{credential_id}")
+                return None
+        except ValueError:
+            logger.warning("Could not parse credential expiration: %s", expiration)
     return get_session_from_credentials(
         access_key_id=creds_data["access_key_id"],
         secret_access_key=creds_data["secret_access_key"],

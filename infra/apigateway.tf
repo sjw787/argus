@@ -5,7 +5,7 @@ resource "aws_apigatewayv2_api" "app" {
   cors_configuration {
     allow_origins = ["https://${var.domain_name}"]
     allow_methods = ["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD", "PATCH"]
-    allow_headers = ["Content-Type", "Authorization", "X-Amz-Date", "X-Api-Key", "X-Amz-Security-Token"]
+    allow_headers = ["Content-Type", "Authorization", "X-Amz-Date", "X-Api-Key", "X-Amz-Security-Token", "X-Credential-Id"]
     expose_headers = ["Content-Length", "X-Request-Id"]
     max_age        = 300
   }

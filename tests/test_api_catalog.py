@@ -27,7 +27,7 @@ def test_list_databases(client, mock_catalog_svc):
     }
     resp = client.get("/api/v1/catalog/databases")
     assert resp.status_code == 200
-    assert resp.json()[0]["name"] == "mydb"
+    assert resp.json()["items"][0]["name"] == "mydb"
 
 
 def test_get_database(client, mock_catalog_svc):
