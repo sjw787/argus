@@ -371,3 +371,15 @@ def sso_select_role(body: SsoSelectRoleRequest):
         credential_id=credential_id,
         message=message,
     )
+
+
+@router.post("/logout")
+def logout(x_credential_id: Annotated[Optional[str], Header()] = None):
+    """
+    Invalidate the current session.
+    - Lambda mode: deletes the credential record from the session store.
+    - Local mode: no server-side state to clear; client clears its own store.
+    """
+    if x_credential_id:
+        delete_session(f"creds:{x_credential_id}")
+    return {"ok": True}

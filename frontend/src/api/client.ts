@@ -400,4 +400,7 @@ export const api = {
         cognitoClientId: r.data.cognito_client_id,
         cognitoDomain: r.data.cognito_domain,
       })),
+
+  signOut: () =>
+    apiClient.post<{ ok: boolean }>('/auth/logout').then(r => r.data),
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { X, Moon, Sun, Zap, History, AlertCircle, Database, AlignLeft, Sliders, Palette, Plug, Lock } from 'lucide-react'
+import { X, Moon, Sun, Zap, History, AlertCircle, Database, AlignLeft, Sliders, Palette, Plug, Lock, LogOut, User } from 'lucide-react'
 import { useThemeStore } from '../../stores/themeStore'
+import { useAuthStore } from '../../stores/authStore'
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../../api/client'
 
@@ -8,12 +9,13 @@ interface Props {
   onClose: () => void
 }
 
-type Section = 'appearance' | 'editor' | 'connection'
+type Section = 'appearance' | 'editor' | 'connection' | 'account'
 
 const NAV_ITEMS: { id: Section; label: string; icon: React.ReactNode }[] = [
   { id: 'appearance', label: 'Appearance', icon: <Palette size={15} /> },
   { id: 'editor', label: 'Editor', icon: <Sliders size={15} /> },
   { id: 'connection', label: 'AWS Connection', icon: <Plug size={15} /> },
+  { id: 'account', label: 'Account', icon: <User size={15} /> },
 ]
 
 function Toggle({ on, onToggle, locked }: { on: boolean; onToggle: () => void; locked?: boolean }) {
@@ -98,6 +100,7 @@ function SettingRow({ icon, label, description, children, locked }: {
 
 export function SettingsModal({ onClose }: Props) {
   const [section, setSection] = useState<Section>('appearance')
+  const [signingOut, setSigningOut] = useState(false)
   const {
     theme, setTheme,
     sqlAutocomplete, setSqlAutocomplete,
@@ -107,9 +110,21 @@ export function SettingsModal({ onClose }: Props) {
     autoLimit, setAutoLimit,
     formatStyle, setFormatStyle,
   } = useThemeStore()
+  const { profile, region, clear: clearAuth } = useAuthStore()
   const { data: config } = useQuery({ queryKey: ['config'], queryFn: api.getConfig, staleTime: 60000 })
   const locked = new Set(config?.locked_settings ?? [])
   const isLocked = (key: string) => locked.has(key)
+
+  async function handleSignOut() {
+    setSigningOut(true)
+    try {
+      await api.signOut()
+    } catch {
+      // best-effort: clear client state regardless
+    }
+    clearAuth()
+    onClose()
+  }
 
   return (
     <div
@@ -321,6 +336,50 @@ export function SettingsModal({ onClose }: Props) {
                 ) : (
                   <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Loading connection info…</p>
                 )}
+              </>
+            )}
+
+            {section === 'account' && (
+              <>
+                <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: 'var(--text-muted)' }}>
+                  Session
+                </div>
+                <div className="rounded-lg overflow-hidden text-xs" style={{ border: '1px solid var(--border)' }}>
+                  {[
+                    ['Profile', profile ?? '—'],
+                    ['Region', region ?? '—'],
+                  ].map(([label, value], i) => (
+                    <div
+                      key={label}
+                      className="flex items-center justify-between px-3 py-2.5"
+                      style={{ borderBottom: i === 0 ? '1px solid var(--border)' : 'none' }}
+                    >
+                      <span style={{ color: 'var(--text-muted)' }}>{label}</span>
+                      <span style={{ color: 'var(--text-primary)', fontFamily: 'monospace' }}>{value}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-2">
+                  <button
+                    onClick={handleSignOut}
+                    disabled={signingOut}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm w-full"
+                    style={{
+                      background: 'var(--bg-secondary)',
+                      border: '1px solid var(--border)',
+                      color: signingOut ? 'var(--text-muted)' : '#ef4444',
+                      cursor: signingOut ? 'not-allowed' : 'pointer',
+                      transition: 'opacity 0.15s',
+                    }}
+                  >
+                    <LogOut size={14} />
+                    {signingOut ? 'Signing out…' : 'Sign Out'}
+                  </button>
+                  <p className="text-xs mt-1.5 px-1" style={{ color: 'var(--text-muted)' }}>
+                    Clears your credentials and returns to the login screen.
+                  </p>
+                </div>
               </>
             )}
           </div>
