@@ -230,3 +230,11 @@ Interactive API docs are available when running locally:
 - **Swagger UI**: http://localhost:8000/docs
 - **ReDoc**: http://localhost:8000/redoc
 
+
+---
+
+## Acknowledgements
+
+This project was designed by [@sjw787](https://github.com/sjw787) and built entirely by [GitHub Copilot](https://github.com/features/copilot) (powered by Claude Sonnet and Opus). Every line of code — backend, frontend, infrastructure, tests, and documentation — was written by AI from a series of prompts, ideas, and product decisions made by the human author.
+
+The ideas, product vision, and architectural direction are the author's. The implementation is AI's. It's an experiment in what's possible when you bring a clear vision and let the tools do the building.
