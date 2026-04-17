@@ -8,7 +8,7 @@ locals {
     ARGUS_SESSION_STORE   = "dynamodb"
     ARGUS_SESSION_TABLE   = aws_dynamodb_table.sessions.name
     LAMBDA_RUNTIME        = "1"
-    ARGUS_OUTPUT_LOCATION = var.output_location
+    ARGUS_OUTPUT_LOCATION = local.effective_output_location
     ARGUS_CORS_ORIGINS    = "https://${var.domain_name}"
     ARGUS_SSO_START_URL   = var.sso_start_url
   }
@@ -82,6 +82,8 @@ resource "aws_iam_role_policy" "lambda_custom" {
           "s3:DeleteObject",
         ]
         Resource = [
+          aws_s3_bucket.athena_metadata.arn,
+          "${aws_s3_bucket.athena_metadata.arn}/*",
           "arn:aws:s3:::${replace(replace(var.output_location, "s3://", ""), "/", "")}",
           "arn:aws:s3:::${replace(replace(var.output_location, "s3://", ""), "/", "")}/*",
           # Broad wildcard for the bucket prefix — narrow if output_location contains a sub-path

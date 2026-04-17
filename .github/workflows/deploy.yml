@@ -182,6 +182,14 @@ jobs:
                 aws_route53_record.app_aaaa "${HZ_ID}_abvr.samwylock.com_AAAA" || true
             fi
           fi
+          # Import primary Athena workgroup (always exists; we manage its OutputLocation)
+          if ! terraform state list | grep -q 'aws_athena_workgroup.primary'; then
+            echo "Importing primary Athena workgroup..."
+            terraform import \
+              -var="environment=${ENVIRONMENT}" \
+              -var="image_uri=${IMAGE_URI}" \
+              aws_athena_workgroup.primary "primary" || true
+          fi
           # Import orphan SSO resources if they exist but aren't in state
           if [ "${TF_VAR_manage_sso}" = "true" ]; then
             SSO_INSTANCE_ARN=$(aws sso-admin list-instances --region "${AWS_REGION}" --query 'Instances[0].InstanceArn' --output text 2>/dev/null || true)

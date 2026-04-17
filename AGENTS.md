@@ -23,7 +23,8 @@ frontend/src/        — React/TypeScript frontend
 infra/               — Terraform (Lambda, CloudFront, S3, DynamoDB, Cognito)
 deploy/              — Dockerfile, build/deploy shell scripts
 tests/               — pytest test suite
-docs/                — Markdown guides
+docs/                — Markdown guides (see `docs/workgroup-routing.md` for
+                       the app's core tenant-isolation invariants)
 ```
 
 ---
