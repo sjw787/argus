@@ -28,11 +28,6 @@ resource "aws_ecr_repository_policy" "app" {
           "ecr:BatchGetImage",
           "ecr:BatchCheckLayerAvailability"
         ]
-        Condition = {
-          StringLike = {
-            "aws:sourceArn" = "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:*"
-          }
-        }
       }
     ]
   })

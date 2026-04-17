@@ -124,6 +124,25 @@ jobs:
           else
             echo "ECR repo already in state, skipping import"
           fi
+          # Remove corrupted ECR repo policy from state so TF can recreate it cleanly
+          if terraform state list | grep -q 'aws_ecr_repository_policy.app'; then
+            echo "Removing ECR repo policy from state for clean recreation..."
+            terraform state rm aws_ecr_repository_policy.app || true
+          fi
+          # Import orphan CloudFront distribution if one exists with our CNAME and isn't in state
+          CF_IN_STATE=$(terraform state list | grep 'aws_cloudfront_distribution.app' || true)
+          if [ -z "$CF_IN_STATE" ]; then
+            ORPHAN_CF=$(aws cloudfront list-distributions \
+              --query "DistributionList.Items[?Aliases.Items[?contains(@,'abvr.samwylock.com')]].Id" \
+              --output text 2>/dev/null || true)
+            if [ -n "$ORPHAN_CF" ]; then
+              echo "Importing orphan CloudFront distribution: $ORPHAN_CF"
+              terraform import \
+                -var="environment=${ENVIRONMENT}" \
+                -var="image_uri=${IMAGE_URI}" \
+                aws_cloudfront_distribution.app "$ORPHAN_CF" || true
+            fi
+          fi
           terraform apply \
             -var="environment=${ENVIRONMENT}" \
             -var="image_uri=${IMAGE_URI}" \
