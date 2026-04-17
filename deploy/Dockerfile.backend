@@ -5,12 +5,11 @@ RUN dnf install -y gcc gcc-c++ && dnf clean all
 
 WORKDIR ${LAMBDA_TASK_ROOT}
 
-# Copy and install Python dependencies
+# Copy source and install
 COPY pyproject.toml .
+COPY src/ ./src/
 RUN pip install --no-cache-dir ".[all]" 2>/dev/null || pip install --no-cache-dir .
 
-# Copy application source
-COPY src/ ./src/
 ENV PYTHONPATH=${LAMBDA_TASK_ROOT}/src
 
 # Lambda handler
