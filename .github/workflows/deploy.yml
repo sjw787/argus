@@ -113,11 +113,16 @@ jobs:
         run: |
           cd infra
           terraform init
-          # Import pre-existing ECR repo if not already in state
-          terraform import \
-            -var="environment=${ENVIRONMENT}" \
-            -var="image_uri=${IMAGE_URI}" \
-            aws_ecr_repository.app "argus-for-athena-${ENVIRONMENT}" 2>/dev/null || true
+          # Import pre-existing ECR repo only if not already in state
+          if ! terraform state list | grep -q 'aws_ecr_repository.app'; then
+            echo "ECR repo not in state, importing..."
+            terraform import \
+              -var="environment=${ENVIRONMENT}" \
+              -var="image_uri=${IMAGE_URI}" \
+              aws_ecr_repository.app "argus-for-athena-${ENVIRONMENT}" || true
+          else
+            echo "ECR repo already in state, skipping import"
+          fi
           terraform apply \
             -var="environment=${ENVIRONMENT}" \
             -var="image_uri=${IMAGE_URI}" \
