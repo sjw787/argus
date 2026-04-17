@@ -1,0 +1,142 @@
+# Agent Instructions
+
+This file provides instructions for AI agents (GitHub Copilot, Claude, etc.) working on the AthenaBeaver project. Follow these guidelines to maintain code quality and keep project documentation accurate as the codebase evolves.
+
+---
+
+## Project Overview
+
+AthenaBeaver is a browser-based DBMS for AWS Athena. It has a **FastAPI backend** and a **React/TypeScript frontend**, deployable locally or on AWS Lambda + CloudFront. The codebase was initially generated entirely by AI and is maintained with continued AI assistance.
+
+Key directories:
+```
+src/athena_beaver/   — Python backend (FastAPI)
+  api/routers/       — HTTP route handlers
+  services/          — AWS SDK business logic (Athena, Glue, SSO)
+  core/              — Config, auth, session store
+  models/            — Pydantic schemas
+frontend/src/        — React/TypeScript frontend
+  components/        — UI components
+  stores/            — Zustand state stores
+  hooks/             — Custom React hooks
+  api/               — Axios client and API functions
+infra/               — Terraform (Lambda, CloudFront, S3, DynamoDB, Cognito)
+deploy/              — Dockerfile, build/deploy shell scripts
+tests/               — pytest test suite
+docs/                — Markdown guides
+```
+
+---
+
+## Development Rules
+
+### Always run the test suite after making changes
+```bash
+cd /path/to/AthenaBeaver
+source venv/bin/activate
+PYTHONPATH=src python -m pytest tests/ -q
+```
+All tests must pass before committing. Do not skip or delete tests to make the suite pass.
+
+### Do not write data to disk during request handling
+The application is a pass-through to AWS APIs. Query results, schema data, and SQL text must **never** be written to files, databases, or logs. Use in-memory buffers only. See [PRIVACY.md](PRIVACY.md).
+
+### No secrets in source code
+All sensitive values (AWS credentials, API keys, Cognito pool IDs) must come from environment variables or AWS-managed secrets. Never hardcode them.
+
+### Keep CORS locked down
+Do not change CORS to allow all origins (`*`). The `AB_CORS_ORIGINS` env var is the correct mechanism.
+
+### Prefer env vars over config file changes
+Runtime behaviour should be controlled via environment variables (see `src/athena_beaver/core/config.py`). The `athena_beaver.yaml` config file is for user preferences only.
+
+---
+
+## When You Add or Modify Tests
+
+Update the test count and module table in **[CONSIDERATIONS.md](CONSIDERATIONS.md)**:
+
+1. Run `PYTHONPATH=src python -m pytest tests/ -q` and note the new total
+2. Update the count in the **Unit Tests** section header: `**N tests passing across M test modules:**`
+3. If you added a new test file, add a row to the module table describing what it covers
+4. If you deleted tests, explain why in your commit message
+
+---
+
+## When You Conduct a Code Review
+
+Append findings to the **Code Reviews** section in **[CONSIDERATIONS.md](CONSIDERATIONS.md)**:
+
+1. Add a new `### Review N — <Topic> (<Month Year>)` subsection
+2. List each finding with severity (🔴 Critical / 🟠 High / 🟡 Medium / 🔵 Low)
+3. Document the resolution (or note if left unresolved and why)
+4. If the review found no issues, record that explicitly — it's meaningful
+
+Severity guide:
+- 🔴 **Critical** — exploitable vulnerability, data loss risk, or auth bypass
+- 🟠 **High** — security weakness, incorrect behaviour under realistic conditions
+- 🟡 **Medium** — missing best practice, degraded security posture
+- 🔵 **Low** — minor issue, informational, or cosmetic
+
+---
+
+## When You Update the Privacy or Security Posture
+
+If you change how data flows, what is stored, or how auth works:
+
+1. Update **[PRIVACY.md](PRIVACY.md)** to reflect the new behaviour
+2. Update the **Security Posture** section in **[CONSIDERATIONS.md](CONSIDERATIONS.md)** if applicable
+3. If a new category of data is now stored (even temporarily), add it to the storage table in PRIVACY.md with retention and purpose
+
+---
+
+## When You Add Infrastructure
+
+If you add a new AWS resource in `infra/`:
+
+1. Document it in [`docs/deployment.md`](docs/deployment.md)
+2. Add any new required env vars to the table in [README.md](README.md)
+3. Check whether the new resource stores customer data — if so, update PRIVACY.md
+
+---
+
+## Commit Message Format
+
+```
+<type>: <short description>
+
+[optional body]
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+```
+
+Types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`, `infra`
+
+---
+
+## What This Project Does Not Do (Keep It That Way)
+
+- ❌ No analytics or telemetry — do not add tracking scripts, error reporting SDKs, or usage metrics
+- ❌ No persistent query storage — do not add a query history database or result cache
+- ❌ No third-party HTTP calls — all network requests go to AWS endpoints only
+- ❌ No logging of query text or result data — logs must never contain customer data
+
+If a feature would require any of the above, flag it explicitly and discuss with the project owner before implementing.
+
+---
+
+## Running Locally
+
+```bash
+# Backend
+source venv/bin/activate
+python main.py
+
+# Frontend
+cd frontend && npm run dev
+
+# Tests
+PYTHONPATH=src python -m pytest tests/ -q
+```
+
+See [`docs/local-development.md`](docs/local-development.md) for full setup instructions.
