@@ -32,11 +32,31 @@ docs/                — Markdown guides
 
 ### Always run the test suite after making changes
 ```bash
-cd /path/to/Argus for Athena
 source venv/bin/activate
-PYTHONPATH=src python -m pytest tests/ -q
+PYTHONPATH=src python -m pytest tests/ -q --cov=argus --cov-report=term-missing
 ```
 All tests must pass before committing. Do not skip or delete tests to make the suite pass.
+
+### Code coverage requirements
+
+Coverage is enforced automatically by a pre-push git hook (`scripts/pre-push`). Install it once after cloning:
+```bash
+bash scripts/install-hooks.sh
+```
+
+The hook enforces a two-phase coverage policy:
+
+| Phase | Condition | Behaviour |
+|-------|-----------|-----------|
+| **Working toward target** | Coverage < 87% | Push allowed with a warning. Add tests to close the gap. |
+| **Target achieved** | Coverage first reaches 87% | `.coverage-threshold-met` is created and committed automatically. |
+| **Floor enforced** | Coverage < 85% after target met | **Push blocked.** Restore coverage before pushing. |
+
+**As an agent, when you add new features or modify existing code:**
+1. Add or update tests to cover the new behaviour
+2. Run coverage locally and check the percentage
+3. If coverage dropped and the floor is active (`.coverage-threshold-met` exists), write additional tests before pushing
+4. Aim to increase coverage with every meaningful change — the current target is **87%**
 
 ### Do not write data to disk during request handling
 The application is a pass-through to AWS APIs. Query results, schema data, and SQL text must **never** be written to files, databases, or logs. Use in-memory buffers only. See [PRIVACY.md](PRIVACY.md).

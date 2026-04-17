@@ -1,0 +1,83 @@
+#!/bin/bash
+# Pre-push git hook: runs test coverage and enforces thresholds.
+#
+# Behaviour:
+#   - Always runs the full test suite with coverage before any push.
+#   - Blocks the push if tests fail.
+#   - Tracks whether the 87% target has ever been achieved (.coverage-threshold-met).
+#   - Before 87% is reached : warns with progress, push is allowed.
+#   - After 87% is reached   : enforces an 85% floor — push blocked if coverage drops below.
+#
+# Install: run scripts/install-hooks.sh from the repo root.
+
+set -euo pipefail
+
+COVERAGE_TARGET=87
+COVERAGE_FLOOR=85
+THRESHOLD_MET_FILE="$(git rev-parse --show-toplevel)/.coverage-threshold-met"
+ROOT="$(git rev-parse --show-toplevel)"
+
+cd "$ROOT"
+
+echo ""
+echo "🔍 Running test suite with coverage..."
+
+# Activate venv if present
+if [ -f "$ROOT/venv/bin/activate" ]; then
+  source "$ROOT/venv/bin/activate"
+fi
+
+# Run tests and capture output
+COVERAGE_OUTPUT=$(PYTHONPATH=src python -m pytest tests/ -q \
+  --cov=argus \
+  --cov-report=term-missing \
+  --tb=short 2>&1) || {
+  echo ""
+  echo "$COVERAGE_OUTPUT"
+  echo ""
+  echo "❌  Tests failed. Push blocked."
+  exit 1
+}
+
+echo "$COVERAGE_OUTPUT" | tail -20
+
+# Extract total coverage percentage (e.g. "44%" → 44)
+COVERAGE_PCT=$(echo "$COVERAGE_OUTPUT" | grep "^TOTAL" | awk '{print $4}' | tr -d '%')
+
+if [ -z "$COVERAGE_PCT" ]; then
+  echo "⚠️  Could not determine coverage percentage — allowing push."
+  exit 0
+fi
+
+echo ""
+echo "📊 Coverage: ${COVERAGE_PCT}%"
+
+# Check if the 87% target has now been met for the first time
+if python3 -c "import sys; sys.exit(0 if float('$COVERAGE_PCT') >= $COVERAGE_TARGET else 1)"; then
+  if [ ! -f "$THRESHOLD_MET_FILE" ]; then
+    echo "🎉 Coverage target of ${COVERAGE_TARGET}% reached! Floor of ${COVERAGE_FLOOR}% is now enforced."
+    echo "$COVERAGE_TARGET" > "$THRESHOLD_MET_FILE"
+    git add "$THRESHOLD_MET_FILE" 2>/dev/null || true
+  fi
+fi
+
+# Enforce floor if target has ever been met
+if [ -f "$THRESHOLD_MET_FILE" ]; then
+  if python3 -c "import sys; sys.exit(0 if float('$COVERAGE_PCT') >= $COVERAGE_FLOOR else 1)"; then
+    echo "✅ Coverage ${COVERAGE_PCT}% meets the ${COVERAGE_FLOOR}% floor. Push allowed."
+    exit 0
+  else
+    echo ""
+    echo "❌  Coverage ${COVERAGE_PCT}% is below the ${COVERAGE_FLOOR}% floor."
+    echo "    The ${COVERAGE_TARGET}% target was previously achieved, so ${COVERAGE_FLOOR}% is now enforced."
+    echo "    Add or fix tests to bring coverage back above ${COVERAGE_FLOOR}% before pushing."
+    exit 1
+  fi
+else
+  # Target not yet reached — warn and encourage
+  REMAINING=$(python3 -c "print(round($COVERAGE_TARGET - float('$COVERAGE_PCT'), 1))")
+  echo "⚠️  Coverage ${COVERAGE_PCT}% is below the ${COVERAGE_TARGET}% target (${REMAINING}pp to go)."
+  echo "   Push allowed — but please add tests to improve coverage toward ${COVERAGE_TARGET}%."
+  echo "   Once ${COVERAGE_TARGET}% is reached, a floor of ${COVERAGE_FLOOR}% will be enforced automatically."
+  exit 0
+fi
