@@ -17,6 +17,51 @@ _SEARCH_PATHS = [
 _config_cache: Optional[AppConfig] = None
 _active_config_path: Optional[Path] = None
 
+# Key used in the session_store for Lambda-persisted config overrides.
+# Stores the mutable subset of AppConfig (assignments, output_locations) so
+# user edits survive Lambda cold starts.
+_CONFIG_OVERRIDES_KEY = "config:overrides"
+
+
+def _is_lambda() -> bool:
+    return os.environ.get("LAMBDA_RUNTIME") == "1"
+
+
+def _load_overrides() -> dict:
+    """Load persisted config overrides from the session store (Lambda mode)."""
+    if not _is_lambda():
+        return {}
+    try:
+        from argus.core.session_store import get_persistent
+        return get_persistent(_CONFIG_OVERRIDES_KEY) or {}
+    except Exception as exc:
+        log.warning("Failed to load persisted config overrides: %s", exc)
+        return {}
+
+
+def _save_overrides(overrides: dict) -> None:
+    """Persist config overrides to the session store (Lambda mode)."""
+    if not _is_lambda():
+        return
+    from argus.core.session_store import put_persistent
+    put_persistent(_CONFIG_OVERRIDES_KEY, overrides)
+
+
+def _apply_overrides(config: AppConfig, overrides: dict) -> AppConfig:
+    """Merge persisted overrides onto the base config."""
+    if not overrides:
+        return config
+    wg_override = overrides.get("workgroups") or {}
+    if wg_override:
+        new_assignments = {**config.workgroups.assignments, **(wg_override.get("assignments") or {})}
+        new_outputs = {**config.workgroups.output_locations, **(wg_override.get("output_locations") or {})}
+        updated_wg = config.workgroups.model_copy(update={
+            "assignments": new_assignments,
+            "output_locations": new_outputs,
+        })
+        config = config.model_copy(update={"workgroups": updated_wg})
+    return config
+
 
 def _load_from_env() -> Optional[AppConfig]:
     """Try to build AppConfig from environment variables. Returns None if no env vars set."""
@@ -48,6 +93,15 @@ def _load_from_env() -> Optional[AppConfig]:
 
 def load_config(config_path: Optional[Path] = None) -> AppConfig:
     global _config_cache, _active_config_path
+
+    # Lambda: always merge fresh overrides from the session store so other
+    # containers' writes are picked up.
+    if _is_lambda():
+        if _config_cache is None:
+            env_cfg = _load_from_env() or AppConfig()
+            _config_cache = env_cfg
+        return _apply_overrides(_config_cache, _load_overrides())
+
     if _config_cache is not None:
         return _config_cache
 
@@ -71,10 +125,18 @@ def load_config(config_path: Optional[Path] = None) -> AppConfig:
 
 
 def save_config(config: AppConfig, config_path: Optional[Path] = None) -> None:
-    """Persist config to YAML and update the in-memory cache."""
+    """Persist config to YAML (local) or DynamoDB (Lambda), and update the cache."""
     global _config_cache, _active_config_path
-    if os.environ.get("LAMBDA_RUNTIME"):
-        log.warning("save_config() called in Lambda mode — skipping file write.")
+    if _is_lambda():
+        # Lambda: only the mutable subset (workgroup assignments + output
+        # locations) is stored. Base config stays env-driven.
+        overrides = {
+            "workgroups": {
+                "assignments": dict(config.workgroups.assignments),
+                "output_locations": dict(config.workgroups.output_locations),
+            }
+        }
+        _save_overrides(overrides)
         _config_cache = config
         return
 

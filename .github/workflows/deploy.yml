@@ -242,6 +242,18 @@ jobs:
           echo "## Subdomain NS Records" >> $GITHUB_STEP_SUMMARY
           echo "Add these NS records for \`abvr.samwylock.com\` in your parent hosted zone:" >> $GITHUB_STEP_SUMMARY
           terraform output -json hosted_zone_name_servers | jq -r '.[]' | while read ns; do echo "- \`$ns\`"; done >> $GITHUB_STEP_SUMMARY || true
+      - name: Force Lambda to pull latest ECR image
+        if: ${{ !inputs.skip_builds }}
+        env:
+          IMAGE_URI: ${{ needs.build-and-push-docker.outputs.image_uri }}
+          ENVIRONMENT: ${{ inputs.environment || 'prod' }}
+        run: |
+          aws lambda update-function-code \
+            --function-name "argus-for-athena-${ENVIRONMENT}" \
+            --image-uri "${IMAGE_URI}" \
+            --publish > /dev/null
+          aws lambda wait function-updated \
+            --function-name "argus-for-athena-${ENVIRONMENT}"
       - name: Sync frontend to S3
         if: ${{ !inputs.skip_builds }}
         run: |

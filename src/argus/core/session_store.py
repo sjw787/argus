@@ -42,6 +42,34 @@ def put_session(session_id: str, data: dict[str, Any], ttl_seconds: int = 600) -
         _memory_store[session_id] = {"data": data, "expires_at": expires_at}
 
 
+def put_persistent(key: str, data: dict[str, Any]) -> None:
+    """Write a non-expiring record. Used for app-level state (e.g. config overrides)."""
+    if _use_dynamodb():
+        table = _get_table()
+        # Set a very long TTL (~10 years) so TTL-based cleanup never touches it
+        table.put_item(Item={
+            "session_id": key,
+            "data": json.dumps(data),
+            "expires_at": int(time.time()) + 315_360_000,
+        })
+        logger.debug("DynamoDB put_persistent: %s", key)
+    else:
+        _memory_store[key] = {"data": data, "expires_at": time.time() + 315_360_000}
+
+
+def get_persistent(key: str) -> dict[str, Any] | None:
+    """Read a non-expiring record. Returns None if missing."""
+    if _use_dynamodb():
+        table = _get_table()
+        resp = table.get_item(Key={"session_id": key})
+        item = resp.get("Item")
+        if not item:
+            return None
+        return json.loads(item["data"])
+    entry = _memory_store.get(key)
+    return entry["data"] if entry else None
+
+
 def get_session(session_id: str) -> dict[str, Any] | None:
     if _use_dynamodb():
         table = _get_table()

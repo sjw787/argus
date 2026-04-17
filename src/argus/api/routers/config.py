@@ -68,8 +68,6 @@ def get_assignments(config: Annotated[AppConfig, Depends(get_config)]):
 
 @router.post("/assignments", response_model=DatabaseAssignmentsResponse)
 def assign_database(body: DatabaseAssignmentRequest, config: Annotated[AppConfig, Depends(get_config)]):
-    if body.workgroup not in config.workgroups.output_locations:
-        raise HTTPException(status_code=404, detail=f"Workgroup '{body.workgroup}' not found in config")
     updated_assignments = {**config.workgroups.assignments, body.database: body.workgroup}
     updated_workgroups = config.workgroups.model_copy(update={"assignments": updated_assignments})
     updated_config = config.model_copy(update={"workgroups": updated_workgroups})
