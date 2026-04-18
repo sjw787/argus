@@ -358,7 +358,7 @@ function WorkgroupRow({
         {isUnassigned
           ? <Lock size={12} style={{ color: 'var(--warning)', opacity: 0.8 }} />
           : <Layers size={13} style={{ color: 'var(--accent)', opacity: 0.7 }} />}
-        <span className="font-semibold uppercase tracking-wide truncate" style={{ fontSize: 10 }}>
+        <span className="font-bold uppercase tracking-wide truncate" style={{ fontSize: 10 }}>
           {workgroup}
         </span>
         <span style={{ fontSize: 10 }}>{dbs.length}</span>
@@ -456,7 +456,7 @@ function DatabaseNode({ db, isUnassigned, expanded, expandedTables, onToggle, on
         {effectivelyUnassigned
           ? <Lock size={12} style={{ color: 'var(--warning)' }} />
           : <Database size={13} style={{ color: 'var(--accent)' }} />}
-        <span className="flex-1 truncate">{db.name}</span>
+        <span className="flex-1 truncate font-bold">{db.name}</span>
         {hovered && (
           <button
             onClick={e => onDbMenu(e, db)}
