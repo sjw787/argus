@@ -105,7 +105,7 @@ export function setActiveDatabase(database: string) {
 }
 
 /** Return true if the cursor position is inside a SQL line or block comment. */
-function isInComment(model: Monaco.editor.ITextModel, position: Monaco.Position): boolean {
+export function isInComment(model: Monaco.editor.ITextModel, position: Monaco.Position): boolean {
   const lineUpToCursor = model.getValueInRange({
     startLineNumber: position.lineNumber, startColumn: 1,
     endLineNumber: position.lineNumber, endColumn: position.column,
