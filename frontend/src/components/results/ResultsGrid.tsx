@@ -2,12 +2,11 @@ import { useRef, useState, useCallback, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { AgGridReact } from 'ag-grid-react'
 import type { ColDef, GridApi, CellContextMenuEvent } from 'ag-grid-community'
-import { format as formatSql } from 'sql-formatter'
 import { api } from '../../api/client'
 import { Download, Ban, Filter, ListFilter } from 'lucide-react'
 import { useThemeStore } from '../../stores/themeStore'
 import { useEditorStore } from '../../stores/editorStore'
-import { splitSqlStatements, addWhereCondition } from '../../utils/sql'
+import { splitSqlStatements, addWhereCondition, applyFormatStyle } from '../../utils/sql'
 
 interface Props {
   queryExecutionId: string
@@ -96,13 +95,7 @@ export function ResultsGrid({ queryExecutionId, queryState, queryError, limitApp
     // Re-run through the formatter to keep the injected clause consistent with
     // the rest of the query's style (keyword case, indentation, line breaks).
     try {
-      newSql = formatSql(newSql, {
-        language: 'trino',
-        tabWidth: 2,
-        keywordCase: 'upper',
-        linesBetweenQueries: 2,
-        indentStyle: formatStyle,
-      })
+      newSql = applyFormatStyle(newSql, formatStyle, { linesBetweenQueries: 2 })
     } catch {
       // If the formatter fails (e.g. partial SQL), keep the raw injection
     }

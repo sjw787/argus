@@ -7,6 +7,32 @@ const BOOLEAN_TYPES = new Set(['boolean'])
 /** Types that use keyword-prefixed date/timestamp literals (still quoted). */
 const TEMPORAL_TYPES = new Set(['date', 'timestamp', 'time'])
 
+import { format as formatSql } from 'sql-formatter'
+import type { FormatStyle } from '../stores/themeStore'
+
+/**
+ * Format a SQL string using the given FormatStyle.
+ * 'oneline' formats with standard indentation then collapses to a single line.
+ */
+export function applyFormatStyle(
+  sql: string,
+  formatStyle: FormatStyle,
+  opts: { linesBetweenQueries?: number } = {}
+): string {
+  const baseIndent = formatStyle === 'oneline' ? 'standard' : formatStyle
+  const formatted = formatSql(sql, {
+    language: 'trino',
+    tabWidth: 2,
+    keywordCase: 'upper',
+    linesBetweenQueries: opts.linesBetweenQueries ?? 2,
+    indentStyle: baseIndent,
+  })
+  if (formatStyle === 'oneline') {
+    return formatted.replace(/\s*\n\s*/g, ' ').trim()
+  }
+  return formatted
+}
+
 /** Format a cell value into a SQL literal appropriate for its column type. */
 export function formatSqlValue(value: string | null, colType?: string): string | null {
   if (value === null) return null

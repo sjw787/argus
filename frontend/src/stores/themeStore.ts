@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 
 type Theme = 'dark' | 'light'
-export type FormatStyle = 'standard' | 'tabularLeft'
+export type FormatStyle = 'standard' | 'tabularLeft' | 'oneline'
 
 interface ThemeStore {
   theme: Theme

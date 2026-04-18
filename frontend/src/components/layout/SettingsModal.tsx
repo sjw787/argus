@@ -261,11 +261,11 @@ export function SettingsModal({ onClose }: Props) {
                 <SettingRow
                   icon={<AlignLeft size={14} />}
                   label="Format Style"
-                  description="Standard: each clause on its own line. Compact: tabular layout, keywords left-aligned."
+                  description="Standard: each clause on its own line. Compact: tabular layout. One-line: entire query on a single line."
                   locked={isLocked('formatStyle')}
                 >
                   <div className="flex rounded overflow-hidden" style={{ border: '1px solid var(--border)', pointerEvents: isLocked('formatStyle') ? 'none' : 'auto', opacity: isLocked('formatStyle') ? 0.5 : 1 }}>
-                    {(['standard', 'tabularLeft'] as const).map(style => (
+                    {(['standard', 'tabularLeft', 'oneline'] as const).map(style => (
                       <button
                         key={style}
                         onClick={() => setFormatStyle(style)}
@@ -278,7 +278,7 @@ export function SettingsModal({ onClose }: Props) {
                           fontWeight: formatStyle === style ? 600 : 400,
                         }}
                       >
-                        {style === 'standard' ? 'Standard' : 'Compact'}
+                        {style === 'standard' ? 'Standard' : style === 'tabularLeft' ? 'Compact' : 'One-line'}
                       </button>
                     ))}
                   </div>

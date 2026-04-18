@@ -3,7 +3,6 @@ import { Allotment } from 'allotment'
 import Editor, { useMonaco, type OnMount } from '@monaco-editor/react'
 import type * as Monaco from 'monaco-editor'
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
-import { format as formatSql } from 'sql-formatter'
 import { api } from '../../api/client'
 import type { ExplainPlanType } from '../../api/client'
 import { useEditorStore } from '../../stores/editorStore'
@@ -12,7 +11,7 @@ import { useQueryNamesStore, extractSqlComment } from '../../stores/queryNamesSt
 import { registerSqlCompletion, unregisterSqlCompletion, setActiveDatabase } from '../../lib/sqlCompletion'
 import { registerSqlDiagnostics, unregisterSqlDiagnostics } from '../../lib/sqlDiagnostics'
 import { ResultsGrid } from '../results/ResultsGrid'
-import { splitSqlStatements } from '../../utils/sql'
+import { splitSqlStatements, applyFormatStyle } from '../../utils/sql'
 import { Play, ChevronDown, Search, WandSparkles, Loader, FileSearch } from 'lucide-react'
 
 
@@ -379,13 +378,7 @@ export function SqlEditorPanel({ tabId }: Props) {
   const handleFormat = useCallback(() => {
     if (!tab?.sql.trim()) return
     try {
-      const formatted = formatSql(tab.sql, {
-        language: 'trino',
-        tabWidth: 2,
-        keywordCase: 'upper',
-        linesBetweenQueries: 2,
-        indentStyle: formatStyle,
-      })
+      const formatted = applyFormatStyle(tab.sql, formatStyle, { linesBetweenQueries: 2 })
       updateTab(tabId, { sql: formatted })
       editorRef.current?.setValue(formatted)
     } catch {

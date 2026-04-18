@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react'
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { format as formatSql } from 'sql-formatter'
+import { applyFormatStyle } from '../../utils/sql'
 import { api } from '../../api/client'
 import { useEditorStore } from '../../stores/editorStore'
 import { useUIStore } from '../../stores/uiStore'
@@ -31,7 +31,7 @@ const PAGE_LIMIT = 50
 function buildSelectTop100(qualifiedName: string, formatStyle: import('../../stores/themeStore').FormatStyle = 'standard') {
   const raw = `SELECT * FROM ${qualifiedName} LIMIT 100`
   try {
-    return formatSql(raw, { language: 'trino', tabWidth: 2, keywordCase: 'upper', indentStyle: formatStyle }) + ';'
+    return applyFormatStyle(raw, formatStyle) + ';'
   } catch {
     return `SELECT *\nFROM ${qualifiedName}\nLIMIT 100;`
   }
