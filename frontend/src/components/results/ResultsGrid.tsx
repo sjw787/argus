@@ -7,7 +7,7 @@ import { api } from '../../api/client'
 import { Download, Ban, Filter, ListFilter } from 'lucide-react'
 import { useThemeStore } from '../../stores/themeStore'
 import { useEditorStore } from '../../stores/editorStore'
-import { splitSqlStatements } from '../../utils/sql'
+import { splitSqlStatements, addWhereCondition } from '../../utils/sql'
 
 interface Props {
   queryExecutionId: string
@@ -28,117 +28,6 @@ interface CellMenu {
   colId: string
   value: string | null
   colType?: string
-}
-
-/** Append or inject a WHERE predicate into a SQL string. */
-/** Athena types that are stored as unquoted literals in SQL. */
-const NUMERIC_TYPES = new Set([
-  'tinyint', 'smallint', 'int', 'integer', 'bigint',
-  'float', 'real', 'double', 'decimal',
-])
-const BOOLEAN_TYPES = new Set(['boolean'])
-/** Types that need date/timestamp literals — still quoted in Athena SQL. */
-const TEMPORAL_TYPES = new Set(['date', 'timestamp', 'time'])
-
-function formatSqlValue(value: string | null, colType?: string): string | null {
-  if (value === null) return null
-  const baseType = colType?.toLowerCase().replace(/\(.*\)/, '').trim()
-  if (baseType && BOOLEAN_TYPES.has(baseType)) {
-    // true/false unquoted
-    const lower = value.toLowerCase()
-    return lower === 'true' || lower === '1' ? 'true' : 'false'
-  }
-  if (baseType && NUMERIC_TYPES.has(baseType)) {
-    return value
-  }
-  if (baseType && TEMPORAL_TYPES.has(baseType)) {
-    // DATE 'YYYY-MM-DD' or TIMESTAMP 'YYYY-MM-DD HH:MM:SS'
-    const prefix = baseType === 'date' ? 'DATE' : baseType === 'time' ? 'TIME' : 'TIMESTAMP'
-    return `${prefix} '${value.replace(/'/g, "''")}'`
-  }
-  // Fallback: heuristic for when no type metadata is available
-  if (/^-?\d+(\.\d+)?$/.test(value)) return value
-  return `'${value.replace(/'/g, "''")}'`
-}
-
-function addWhereCondition(sql: string, col: string, value: string | null, colType?: string): string {
-  // Detect whether the query uses uppercase keywords so we can match
-  const upper = /\bSELECT\b/.test(sql) || /\bFROM\b/.test(sql)
-  const kw = (s: string) => upper ? s.toUpperCase() : s.toLowerCase()
-
-  // Always double-quote column names to match the style Athena uses for identifiers
-  const colRef = `"${col}"`
-  const escapedCol = colRef.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-
-  const formattedValue = formatSqlValue(value, colType)
-
-  // Strip trailing semicolons/whitespace to manipulate cleanly
-  const trimmed = sql.trimEnd().replace(/;+$/, '').trimEnd()
-
-  // Detect indentation from the clause keyword level (FROM/WHERE/ORDER BY),
-  // not from the last line which may be a JOIN or continuation
-  const clauseIndentMatch = trimmed.match(/^([ \t]*)(?:FROM|WHERE|ORDER\s+BY|GROUP\s+BY|HAVING|LIMIT)\b/im)
-  const clauseIndent = clauseIndentMatch?.[1] ?? ''
-
-  const whereRe = /\bWHERE\b/i
-  const clauseRe = /\b(ORDER\s+BY|GROUP\s+BY|HAVING|LIMIT)\b/i
-
-  // If WHERE exists and value is non-null, try to merge into an existing condition
-  // for the same column rather than adding a separate AND
-  if (whereRe.test(trimmed) && formattedValue !== null) {
-    // Case 1: col IN (...) already exists — append to the IN list
-    const inRe = new RegExp(`(${escapedCol}\\s+IN\\s*\\()([^)]*)(\\))`, 'i')
-    const inMatch = inRe.exec(trimmed)
-    if (inMatch) {
-      const updated = trimmed.replace(inRe, (_, open, list, close) =>
-        `${open}${list.trimEnd()}, ${formattedValue}${close}`
-      )
-      return updated + ';'
-    }
-
-    // Case 2: col = value exists — convert to col IN (old, new)
-    // Match quoted strings, numbers, and keyword-prefixed literals like DATE '...' / TIMESTAMP '...'
-    const eqRe = new RegExp(
-      `${escapedCol}\\s*=\\s*((?:DATE|TIMESTAMP|TIME)\\s+'(?:[^']|'')*'|'(?:[^']|'')*'|-?\\d+(?:\\.\\d+)?)`,
-      'i'
-    )
-    const eqMatch = eqRe.exec(trimmed)
-    if (eqMatch) {
-      const existingVal = eqMatch[1]
-      const updated = trimmed.replace(eqRe,
-        `${colRef} ${kw('in')} (${existingVal}, ${formattedValue})`
-      )
-      return updated + ';'
-    }
-  }
-
-  // Build a simple equality/null predicate for the AND/WHERE path
-  let predicate: string
-  if (value === null) {
-    predicate = `${colRef} ${kw('is null')}`
-  } else {
-    predicate = `${colRef} = ${formattedValue}`
-  }
-
-  if (whereRe.test(trimmed)) {
-    // WHERE already exists — insert AND before any trailing clause, or append
-    const match = clauseRe.exec(trimmed)
-    if (match) {
-      const before = trimmed.slice(0, match.index).trimEnd()
-      const after = trimmed.slice(match.index).trimStart()
-      return `${before}\n${clauseIndent}${kw('and')} ${predicate}\n${clauseIndent}${after};`
-    }
-    return `${trimmed}\n${clauseIndent}${kw('and')} ${predicate};`
-  }
-
-  // No WHERE — insert before ORDER BY / GROUP BY / HAVING / LIMIT, or at end
-  const match = clauseRe.exec(trimmed)
-  if (match) {
-    const before = trimmed.slice(0, match.index).trimEnd()
-    const after = trimmed.slice(match.index).trimStart()
-    return `${before}\n${clauseIndent}${kw('where')} ${predicate}\n${clauseIndent}${after};`
-  }
-  return `${trimmed}\n${clauseIndent}${kw('where')} ${predicate};`
 }
 
 export function ResultsGrid({ queryExecutionId, queryState, queryError, limitApplied, autoLimit, onCancel, tabId, queryIndex }: Props) {
@@ -191,12 +80,15 @@ export function ResultsGrid({ queryExecutionId, queryState, queryError, limitApp
 
     let newSql: string
     if (queryIndex !== undefined) {
-      // Multi-query tab — only modify the statement that produced these results
+      // Multi-query tab — only modify the statement that produced these results.
+      // splitSqlStatements strips semicolons, so we must restore them on all
+      // statements before joining; otherwise formatSql sees one big statement
+      // and removes the inter-query semicolons.
       const stmts = splitSqlStatements(tab.sql)
       const target = stmts[queryIndex]
       if (target === undefined) return
       stmts[queryIndex] = addWhereCondition(target, cellMenu.colId, cellMenu.value, cellMenu.colType)
-      newSql = stmts.join('\n\n')
+      newSql = stmts.map(s => s.trimEnd().replace(/;+$/, '') + ';').join('\n\n')
     } else {
       newSql = addWhereCondition(tab.sql, cellMenu.colId, cellMenu.value, cellMenu.colType)
     }
