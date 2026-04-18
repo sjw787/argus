@@ -52,6 +52,31 @@ test('spacebar in block comment does not open autocomplete', async ({ page }) =>
   await expect(suggest).not.toBeVisible({ timeout: 2_000 })
 })
 
+test('spacebar always inserts a literal space, even when suggest widget is open', async ({ page }) => {
+  // Regression: Monaco's default `acceptSuggestionOnCommitCharacter: true` made
+  // space accept the highlighted SQL keyword instead of inserting a space, so
+  // typing "SEL " produced "SELECT" or "SEL<keyword>" instead of "SEL ".
+  await setEditorContent(page, 'SEL')
+
+  // Wait for the suggest widget to appear so we exercise the commit-character path
+  const suggest = page.locator('.suggest-widget')
+  await expect(suggest).toBeVisible({ timeout: 8_000 })
+
+  // Now press space — it must insert a literal space, NOT accept the highlighted suggestion
+  await page.keyboard.press('Space')
+  await page.keyboard.type('FROM')
+
+  // Read the editor's full text via DOM (concatenate all .view-line spans).
+  // Use evaluate so we can wait for Monaco to render after the keystrokes.
+  const editorValue = await page.evaluate(() => {
+    const lines = Array.from(document.querySelectorAll('.view-line'))
+    // Monaco renders spaces as non-breaking spaces (U+00A0) for layout; normalize.
+    return lines.map(l => (l as HTMLElement).innerText.replace(/\u00A0/g, ' ')).join('\n').trim()
+  })
+  expect(editorValue).toContain('SEL FROM')
+  expect(editorValue).not.toMatch(/SELECTFROM|SELECT FROM/)
+})
+
 test('autocomplete appears for SQL keywords', async ({ page }) => {
   await setEditorContent(page, 'SEL')
 

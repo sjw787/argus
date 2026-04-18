@@ -563,9 +563,15 @@ export function SqlEditorPanel({ tabId }: Props) {
               wordWrap: 'on',
               tabSize: 2,
               renderLineHighlight: 'line',
-              quickSuggestions: sqlAutocomplete ? { other: true, comments: false, strings: true } : false,
+              quickSuggestions: sqlAutocomplete ? { other: true, comments: false, strings: false } : false,
               suggestOnTriggerCharacters: sqlAutocomplete,
               parameterHints: { enabled: sqlAutocomplete },
+              // Spacebar must always insert a literal space, never accept the
+              // highlighted completion. Monaco's default treats space as a
+              // commit character which made typing inside SQL feel broken
+              // (especially after keywords like SELECT, FROM).
+              acceptSuggestionOnCommitCharacter: false,
+              acceptSuggestionOnEnter: 'on',
             }}
           />
         </Allotment.Pane>
