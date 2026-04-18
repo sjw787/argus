@@ -28,6 +28,11 @@ apiClient.interceptors.request.use(config => {
   if (credentialId) {
     config.headers['X-Credential-Id'] = credentialId
   }
+  // Inject Cognito bearer token when present (cognito auth mode)
+  const cognitoToken = sessionStorage.getItem('cognito_access_token')
+  if (cognitoToken && !config.headers['Authorization']) {
+    config.headers['Authorization'] = `Bearer ${cognitoToken}`
+  }
   return config
 })
 

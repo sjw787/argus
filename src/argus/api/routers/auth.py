@@ -35,6 +35,7 @@ from argus.core.session_store import (
 )
 from argus.models.schemas import AppConfig
 from argus.services.sso_service import DeviceAuthSession, SsoService
+from argus.api.errors import sanitize_error
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -207,7 +208,7 @@ def sso_start(body: SsoStartRequest):
     try:
         session = svc.start_login(start_url=body.start_url)
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise sanitize_error(exc, status_code=400, public_message="Authentication failed") from exc
 
     session_id = str(uuid.uuid4())
     put_session(session_id, dataclasses.asdict(session))
@@ -269,7 +270,7 @@ def sso_list_accounts(session_id: str):
     try:
         accounts = svc.list_accounts(token)
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise sanitize_error(exc, status_code=400, public_message="Authentication failed") from exc
 
     return [
         SsoAccount(account_id=a.account_id, account_name=a.account_name, email=a.email)
@@ -293,7 +294,7 @@ def sso_list_roles(session_id: str, account_id: str):
     try:
         roles = svc.list_roles(token, account_id)
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise sanitize_error(exc, status_code=400, public_message="Authentication failed") from exc
 
     return [SsoRole(account_id=r.account_id, role_name=r.role_name) for r in roles]
 
@@ -319,7 +320,7 @@ def sso_select_role(body: SsoSelectRoleRequest):
     try:
         creds = svc.get_credentials(token, body.account_id, body.role_name)
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise sanitize_error(exc, status_code=400, public_message="Authentication failed") from exc
 
     is_lambda = os.environ.get("LAMBDA_RUNTIME") == "1"
 
@@ -352,7 +353,7 @@ def sso_select_role(body: SsoSelectRoleRequest):
                 role_name=body.role_name,
             )
         except Exception as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+            raise sanitize_error(exc, status_code=400, public_message="Authentication failed") from exc
         # Bust the boto3 session cache so subsequent requests use the new credentials
         reset_session_cache()
         credential_id = None

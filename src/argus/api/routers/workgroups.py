@@ -11,6 +11,7 @@ from argus.api.schemas import (
 from argus.api.dependencies import get_workgroup_service, get_config, get_s3
 from argus.services.workgroup_service import WorkgroupService
 from argus.models.schemas import AppConfig
+from argus.api.errors import sanitize_error
 
 router = APIRouter(prefix="/workgroups", tags=["workgroups"])
 
@@ -127,7 +128,7 @@ def list_workgroups(
                 result.append(WorkgroupItem(name=wg_summary["Name"], state=wg_summary.get("State")))
         return result
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise sanitize_error(e, status_code=400, public_message="Workgroup operation failed")
 
 
 @router.get("/{name}", response_model=WorkgroupItem)
@@ -139,7 +140,7 @@ def get_workgroup(
         resp = svc.get_work_group(name)
         return _parse_wg(resp["WorkGroup"])
     except Exception as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise sanitize_error(e, status_code=404, public_message="Workgroup operation failed")
 
 
 @router.post("", response_model=WorkgroupItem)
@@ -156,7 +157,7 @@ def create_workgroup(
         svc.create_work_group(body.name, body.description, configuration=config or None, tags=body.tags or None)
         return WorkgroupItem(name=body.name, description=body.description, output_location=body.output_location)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise sanitize_error(e, status_code=400, public_message="Workgroup operation failed")
 
 
 @router.put("/{name}", response_model=WorkgroupItem)
@@ -173,7 +174,7 @@ def update_workgroup(
         resp = svc.get_work_group(name)
         return _parse_wg(resp["WorkGroup"])
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise sanitize_error(e, status_code=400, public_message="Workgroup operation failed")
 
 
 @router.delete("/{name}")
@@ -186,7 +187,7 @@ def delete_workgroup(
         svc.delete_work_group(name, recursive_delete_option=recursive)
         return {"message": f"Workgroup {name} deleted"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise sanitize_error(e, status_code=400, public_message="Workgroup operation failed")
 
 
 @router.get("/{name}/tags", response_model=list[TagItem])
@@ -199,7 +200,7 @@ def list_tags(
         resp = svc.list_tags_for_resource(resource_arn)
         return [TagItem(key=t["Key"], value=t["Value"]) for t in resp.get("Tags", [])]
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise sanitize_error(e, status_code=400, public_message="Workgroup operation failed")
 
 
 @router.put("/{name}/tags")
@@ -214,4 +215,4 @@ def update_tags(
         svc.tag_resource(resource_arn, tag_dict)
         return {"message": "Tags updated"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise sanitize_error(e, status_code=400, public_message="Workgroup operation failed")

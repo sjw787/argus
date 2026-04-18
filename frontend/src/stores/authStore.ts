@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { createJSONStorage, persist } from 'zustand/middleware'
 
 interface AuthStore {
   authenticated: boolean
@@ -31,10 +31,17 @@ export const useAuthStore = create<AuthStore>()(
       setAuthenticated: (authenticated) => set({ authenticated }),
       setProfiles: (profiles) => set({ profiles }),
       setSessionExpired: (sessionExpired) => set({ sessionExpired }),
-      clear: () => set({ authenticated: false, profile: null, region: null, credentialId: null, sessionExpired: false, lastAuthTime: 0 }),
+      clear: () => {
+      sessionStorage.removeItem('cognito_access_token')
+      set({ authenticated: false, profile: null, region: null, credentialId: null, sessionExpired: false, lastAuthTime: 0 })
+    },
     }),
     {
       name: 'argus-auth',
+      // Use sessionStorage instead of localStorage so the credentialId (a bearer
+      // token for DynamoDB-stored AWS credentials) is not exposed to XSS across
+      // tabs/reloads beyond the browser session and expires when the tab closes.
+      storage: createJSONStorage(() => sessionStorage),
       partialize: (state) => ({
         authenticated: state.authenticated,
         profile: state.profile,

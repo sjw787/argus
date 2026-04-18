@@ -187,11 +187,16 @@ def test_delete_named_query(client, mock_athena_svc):
     assert resp.status_code == 200
 
 
-def test_execute_query_error(client, mock_athena_svc):
+def test_execute_query_error(client, mock_athena_svc, caplog):
+    import logging
     mock_athena_svc.start_query_execution.side_effect = Exception("AccessDenied")
-    resp = client.post("/api/v1/queries/execute", json={"sql": "SELECT 1", "database": "mydb"})
+    with caplog.at_level(logging.ERROR, logger="argus.api.errors"):
+        resp = client.post("/api/v1/queries/execute", json={"sql": "SELECT 1", "database": "mydb"})
     assert resp.status_code == 400
-    assert "AccessDenied" in resp.json()["detail"]
+    # Sanitized: client gets a generic message, but AWS error is logged server-side
+    assert "AccessDenied" not in resp.json()["detail"]
+    assert "request_id=" in resp.json()["detail"]
+    assert "AccessDenied" in caplog.text
 
 
 # ---------------------------------------------------------------------------
@@ -371,11 +376,16 @@ def test_delete_named_query(client, mock_athena_svc):
     assert resp.status_code == 200
 
 
-def test_execute_query_error(client, mock_athena_svc):
+def test_execute_query_error(client, mock_athena_svc, caplog):
+    import logging
     mock_athena_svc.start_query_execution.side_effect = Exception("AccessDenied")
-    resp = client.post("/api/v1/queries/execute", json={"sql": "SELECT 1", "database": "mydb"})
+    with caplog.at_level(logging.ERROR, logger="argus.api.errors"):
+        resp = client.post("/api/v1/queries/execute", json={"sql": "SELECT 1", "database": "mydb"})
     assert resp.status_code == 400
-    assert "AccessDenied" in resp.json()["detail"]
+    # Sanitized: client gets a generic message, but AWS error is logged server-side
+    assert "AccessDenied" not in resp.json()["detail"]
+    assert "request_id=" in resp.json()["detail"]
+    assert "AccessDenied" in caplog.text
 
 
 # ---------------------------------------------------------------------------

@@ -10,7 +10,7 @@ The premise: *AI can write the code, but a human still has to own the outcome.* 
 
 A full test suite covers the core application logic. Tests were written alongside the code and validated against the real application behaviour.
 
-**289 tests passing across 18 test modules:**
+**295 tests passing across 19 test modules:**
 
 | Module | What It Covers |
 |--------|---------------|
@@ -30,6 +30,7 @@ A full test suite covers the core application logic. Tests were written alongsid
 | `test_aws_endpoints.py` | FIPS endpoint URL helper: service mapping, region interpolation, enable/disable (100% coverage) |
 | `test_audit_logger.py` | AuditLogger: enable/disable, field correctness, privacy guarantees, action classification, middleware integration |
 | `test_auth_session_cache.py` | boto3 session cache: TTL expiry, per-key isolation, invalidation, reset |
+| `test_error_sanitization.py` | `sanitize_error` helper: generic client messages, request_id correlation, verbose-mode opt-in, server-side logging |
 | `functional/test_query_flow.py` | HTTP-level execute → status → results flow; error cases |
 | `functional/test_export_flow.py` | HTTP-level export access control, CSV/JSON formats, error propagation |
 
@@ -37,7 +38,7 @@ Tests use `pytest` with `unittest.mock` to isolate AWS API calls. No real AWS cr
 
 ```bash
 PYTHONPATH=src python -m pytest tests/ -q
-# 289 passed
+# 295 passed
 ```
 
 Current line coverage: **59%** (target: 87%). Key service modules (`sso_service.py`, `session_store.py`, `lambda_handler.py`, `aws_endpoints.py`) are now at 100% coverage. Remaining gap is concentrated in the Typer CLI layer (0%) and some router dependency paths. Coverage is enforced by a pre-push ratchet hook — it can only go up between pushes.
@@ -102,6 +103,15 @@ Second full-codebase review focusing on areas not covered in prior reviews. Two 
 
 - 🔴 **SQL injection in information_schema table endpoint** (`catalog.py:255`): The `table_name` URL path parameter was directly interpolated into an Athena SQL query via an f-string (`AND table_name = '{table_name}'`). Since Athena doesn't support parameterized queries, a crafted path with `UNION SELECT` could exfiltrate data from any database the IAM role has access to. Fixed: added strict allowlist validation (`^[a-zA-Z0-9_]+$`) that returns HTTP 400 before any query is constructed. ✅ Resolved. 18 new tests cover both malicious inputs (6 bad names → 400) and valid inputs (4 good names → 200 with safe query).
 - 🟠 **boto3 session cache had no TTL** (`auth.py:6-36`): The `_session_cache` dict held `boto3.Session` objects indefinitely by `(profile, region)` key. If credentials from the underlying profile expired (e.g. after an 8-hour SSO session), requests would fail with `ExpiredToken` errors that required a process restart. Fixed: changed the cache value to `(Session, created_at)` tuple; sessions are evicted after 1 hour (`_SESSION_TTL = 3600`). Added `invalidate_session(profile, region)` for targeted on-demand invalidation. 8 new tests cover TTL expiry, per-key isolation, reset, and invalidation.
+
+### Review 6 — Frontend Auth & Error Hygiene, Round 3 (April 2026)
+
+Third review focused on the full-stack auth flow and how backend exceptions surface to clients. Three real issues were fixed; one agent finding was reviewed and dismissed.
+
+- 🔴 **Cognito Authorization header never sent** (`frontend/src/api/client.ts`): `AuthCallback.tsx` stored the Cognito access token in `sessionStorage`, but the axios client only had an interceptor for `X-Credential-Id` (SSO mode). In Cognito mode, every API request went out without an `Authorization` header, so the backend consistently rejected them with 401. Fixed: added a second request interceptor that reads `sessionStorage.getItem('cognito_access_token')` and sets `Authorization: Bearer <token>` when present. The logout flow (`authStore.clear`) now also clears the token from sessionStorage. ✅ Resolved.
+- 🟠 **`credentialId` persisted to `localStorage`** (`frontend/src/stores/authStore.ts`): The Zustand `persist` middleware defaulted to localStorage, so the credentialId — which is effectively a bearer token for the DynamoDB-stored AWS credentials — survived tab closes and was readable by any script in the origin. Fixed: switched the persisted store to `createJSONStorage(() => sessionStorage)` so the token now expires when the tab closes and does not outlive the browser session. ✅ Resolved.
+- 🟠 **AWS error strings leaked via `HTTPException(detail=str(e))`** (40 sites across `catalog.py`, `queries.py`, `workgroups.py`, `export.py`, `auth.py`): Raw `boto3`/`botocore` exceptions were propagated to clients verbatim, including account IDs, role ARNs, bucket names, and `QueryExecutionId`s. Fixed: introduced `argus.api.errors.sanitize_error()` which logs the full exception server-side (with a short `request_id`) and returns an `HTTPException` with a generic message plus that `request_id` for correlation. Set `ARGUS_VERBOSE_ERRORS=true` to opt back into raw messages for local development. All 40 sites refactored. ✅ Resolved. 6 new tests cover the helper; 4 existing tests updated to assert sanitized output.
+- ❌ **"IDOR via `X-Credential-Id`" — misclassified**: The agent flagged that a user could read another user's credentials by sending a different `X-Credential-Id`. This finding was dismissed on inspection: the credential id is a server-generated `uuid.uuid4()` (122 bits of entropy) that IS the bearer token in the SSO architecture. There is no separate "user identity" layer to bypass. Knowing the uuid means being the user, by design — this is the same security model as a session cookie, not an Insecure Direct Object Reference. No code change required.
 
 ---
 

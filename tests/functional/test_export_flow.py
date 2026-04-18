@@ -133,4 +133,5 @@ def test_export_returns_400_when_athena_service_raises():
     resp = client.post("/api/v1/export/bad-qid", json={"format": "csv"})
 
     assert resp.status_code == 400
-    assert "QueryNotFound" in resp.json()["detail"]
+    assert "QueryNotFound" not in resp.json()["detail"]
+    assert "request_id=" in resp.json()["detail"]

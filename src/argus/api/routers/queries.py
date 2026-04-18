@@ -16,6 +16,7 @@ from argus.api.dependencies import get_athena_service, get_config
 from argus.api.sse import query_status_stream
 from argus.services.athena_service import AthenaService
 from argus.models.schemas import AppConfig
+from argus.api.errors import sanitize_error
 
 router = APIRouter(prefix="/queries", tags=["queries"])
 
@@ -173,7 +174,7 @@ def execute_query(
         )
         return ExecuteQueryResponse(query_execution_id=resp["QueryExecutionId"], limit_applied=limit_applied)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise sanitize_error(e, status_code=400, public_message="Query operation failed")
 
 
 @router.post("/explain", response_model=ExecuteQueryResponse)
@@ -204,7 +205,7 @@ def explain_query(
         )
         return ExecuteQueryResponse(query_execution_id=resp["QueryExecutionId"], limit_applied=False)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise sanitize_error(e, status_code=400, public_message="Query operation failed")
 
 
 @router.get("/named/list", response_model=list[NamedQueryItem])
@@ -230,7 +231,7 @@ def list_named_queries(
             for nq in details.get("NamedQueries", [])
         ]
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise sanitize_error(e, status_code=400, public_message="Query operation failed")
 
 
 @router.post("/named", response_model=dict)
@@ -242,7 +243,7 @@ def create_named_query(
         resp = svc.create_named_query(body.name, body.sql, body.database, body.description, body.workgroup)
         return {"named_query_id": resp["NamedQueryId"]}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise sanitize_error(e, status_code=400, public_message="Query operation failed")
 
 
 @router.get("/named/{named_query_id}", response_model=NamedQueryItem)
@@ -262,7 +263,7 @@ def get_named_query(
             query=nq.get("QueryString"),
         )
     except Exception as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise sanitize_error(e, status_code=404, public_message="Query operation failed")
 
 
 @router.delete("/named/{named_query_id}")
@@ -274,7 +275,7 @@ def delete_named_query(
         svc.delete_named_query(named_query_id)
         return {"message": f"Named query {named_query_id} deleted"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise sanitize_error(e, status_code=400, public_message="Query operation failed")
 
 
 @router.get("/prepared/list", response_model=list[PreparedStatementItem])
@@ -294,7 +295,7 @@ def list_prepared_statements(
             for s in resp.get("PreparedStatements", [])
         ]
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise sanitize_error(e, status_code=400, public_message="Query operation failed")
 
 
 @router.post("/prepared")
@@ -306,7 +307,7 @@ def create_prepared_statement(
         svc.create_prepared_statement(body.statement_name, body.workgroup, body.query, body.description)
         return {"message": f"Prepared statement {body.statement_name} created"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise sanitize_error(e, status_code=400, public_message="Query operation failed")
 
 
 @router.put("/prepared/{statement_name}")
@@ -320,7 +321,7 @@ def update_prepared_statement(
         svc.update_prepared_statement(statement_name, workgroup, body.query, body.description)
         return {"message": f"Prepared statement {statement_name} updated"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise sanitize_error(e, status_code=400, public_message="Query operation failed")
 
 
 @router.delete("/prepared/{statement_name}")
@@ -333,7 +334,7 @@ def delete_prepared_statement(
         svc.delete_prepared_statement(statement_name, workgroup)
         return {"message": f"Prepared statement {statement_name} deleted"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise sanitize_error(e, status_code=400, public_message="Query operation failed")
 
 
 @router.get("", response_model=list[QueryListItem])
@@ -386,7 +387,7 @@ def list_queries(
         result.sort(key=lambda q: q.submitted or "", reverse=True)
         return result
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise sanitize_error(e, status_code=400, public_message="Query operation failed")
 
 
 @router.get("/{query_id}", response_model=QueryExecutionDetail)
@@ -398,7 +399,7 @@ def get_query(
         resp = svc.get_query_execution(query_id)
         return _parse_execution(resp["QueryExecution"])
     except Exception as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise sanitize_error(e, status_code=404, public_message="Query operation failed")
 
 
 @router.get("/{query_id}/status", response_model=QueryStatusSnapshot)
@@ -420,7 +421,7 @@ def get_query_status(
             completed_at=str(status.get("CompletionDateTime", "")) or None,
         )
     except Exception as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise sanitize_error(e, status_code=404, public_message="Query operation failed")
 
 
 @router.get("/{query_id}/stream")
@@ -470,7 +471,7 @@ def get_query_results(
             row_count=len(rows),
         )
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise sanitize_error(e, status_code=400, public_message="Query operation failed")
 
 
 @router.post("/{query_id}/cancel")
@@ -482,4 +483,4 @@ def cancel_query(
         svc.stop_query_execution(query_id)
         return {"message": f"Query {query_id} cancelled"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise sanitize_error(e, status_code=400, public_message="Query operation failed")

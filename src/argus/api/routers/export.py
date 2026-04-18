@@ -9,6 +9,7 @@ from argus.api.schemas import ExportRequest
 from argus.api.dependencies import get_athena_service, get_config
 from argus.services.athena_service import AthenaService
 from argus.models.schemas import AppConfig
+from argus.api.errors import sanitize_error
 
 router = APIRouter(prefix="/export", tags=["export"])
 
@@ -71,7 +72,7 @@ def export_results(
     try:
         headers, rows = _fetch_all_results(svc, query_id)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise sanitize_error(e, status_code=400, public_message="Export failed")
 
     filename = f"query_{query_id[:8]}.{EXTENSIONS[fmt]}"
 

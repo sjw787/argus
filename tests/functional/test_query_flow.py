@@ -134,7 +134,9 @@ def test_results_returns_400_on_service_error():
     resp = client.get("/api/v1/queries/qid-err/results")
 
     assert resp.status_code == 400
-    assert "InvalidRequestException" in resp.json()["detail"]
+    # Sanitized response: generic message with a request id, not the raw AWS error.
+    assert "InvalidRequestException" not in resp.json()["detail"]
+    assert "request_id=" in resp.json()["detail"]
 
 
 def test_execute_returns_400_on_athena_error():
@@ -147,7 +149,8 @@ def test_execute_returns_400_on_athena_error():
     )
 
     assert resp.status_code == 400
-    assert "AccessDeniedException" in resp.json()["detail"]
+    assert "AccessDeniedException" not in resp.json()["detail"]
+    assert "request_id=" in resp.json()["detail"]
 
 
 def test_failed_query_state_is_reflected_in_status():

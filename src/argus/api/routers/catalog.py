@@ -13,6 +13,7 @@ from argus.api.dependencies import get_catalog_service, get_config, get_athena_s
 from argus.services.catalog_service import CatalogService
 from argus.services.athena_service import AthenaService
 from argus.models.schemas import AppConfig
+from argus.api.errors import sanitize_error
 
 router = APIRouter(prefix="/catalog", tags=["catalog"])
 
@@ -125,7 +126,7 @@ def list_databases(
             has_more=(offset + limit) < len(filtered),
         )
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise sanitize_error(e, status_code=400, public_message="Catalog operation failed")
 
 
 @router.get("/databases/{name}", response_model=DatabaseItem)
@@ -144,7 +145,7 @@ def get_database(
             parameters=db.get("Parameters", {}),
         )
     except Exception as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise sanitize_error(e, status_code=404, public_message="Catalog operation failed")
 
 
 @router.post("/databases", response_model=DatabaseItem)
@@ -157,7 +158,7 @@ def create_database(
         _db_cache.invalidate_all()
         return DatabaseItem(name=body.name, description=body.description, location_uri=body.location_uri)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise sanitize_error(e, status_code=400, public_message="Catalog operation failed")
 
 
 @router.delete("/databases/{name}")
@@ -171,7 +172,7 @@ def delete_database(
         _db_cache.invalidate_all()
         return {"message": f"Database {name} deleted"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise sanitize_error(e, status_code=400, public_message="Catalog operation failed")
 
 
 @router.get("/databases/information_schema/tables", response_model=list[TableSummary])
@@ -216,7 +217,7 @@ def list_information_schema_tables(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise sanitize_error(e, status_code=400, public_message="Catalog operation failed")
 
 
 @router.get("/databases/{db_name}/tables", response_model=list[TableSummary])
@@ -239,7 +240,7 @@ def list_tables(
             for t in resp.get("TableList", [])
         ]
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise sanitize_error(e, status_code=400, public_message="Catalog operation failed")
 
 
 @router.get("/databases/information_schema/tables/{table_name}", response_model=TableItem)
@@ -286,7 +287,7 @@ def get_information_schema_table(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise sanitize_error(e, status_code=400, public_message="Catalog operation failed")
 
 
 @router.get("/databases/{db_name}/tables/{table_name}", response_model=TableItem)
@@ -300,7 +301,7 @@ def get_table(
         resp = svc.get_table(db_name, table_name, catalog_id)
         return _parse_table(resp["Table"], db_name)
     except Exception as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise sanitize_error(e, status_code=404, public_message="Catalog operation failed")
 
 
 @router.delete("/databases/{db_name}/tables/{table_name}")
@@ -314,7 +315,7 @@ def delete_table(
         svc.delete_table(db_name, table_name, catalog_id)
         return {"message": f"Table {table_name} deleted from {db_name}"}
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise sanitize_error(e, status_code=400, public_message="Catalog operation failed")
 
 
 @router.get("/databases/{db_name}/tables/{table_name}/partitions", response_model=list[PartitionItem])
@@ -337,7 +338,7 @@ def list_partitions(
             for p in resp.get("Partitions", [])
         ]
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise sanitize_error(e, status_code=400, public_message="Catalog operation failed")
 
 
 @router.get("/databases/{db_name}/tables/{table_name}/versions")
@@ -351,7 +352,7 @@ def get_table_versions(
         resp = svc.get_table_versions(db_name, table_name, catalog_id=catalog_id)
         return resp.get("TableVersions", [])
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise sanitize_error(e, status_code=400, public_message="Catalog operation failed")
 
 
 @router.get("/databases/{db_name}/er-diagram", response_model=ErDiagramData)
@@ -419,4 +420,4 @@ def get_er_diagram(
 
         return ErDiagramData(nodes=nodes, edges=edges)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise sanitize_error(e, status_code=400, public_message="Catalog operation failed")
