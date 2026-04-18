@@ -14,19 +14,48 @@ const nodeTypes = { tableNode: TableNodeComponent }
 
 function buildLayout(data: ErDiagramData): { nodes: Node[]; edges: Edge[] } {
   const COLS = 3
-  const CARD_WIDTH = 220
-  const CARD_HEIGHT_BASE = 80
-  const GAP_X = 60
-  const GAP_Y = 40
+  // Match TableNode: minWidth 200, but long type names ("varchar(255)", "decimal(38,10)")
+  // and table names can push the rendered width well past that. Reserve generously.
+  const CARD_WIDTH = 280
+  // Per-row vertical sizing — header + 1 line per column + partition header + bottom padding.
+  // The previous 80 + 20*N underestimated the rendered ~24px row + ~32px header,
+  // so tables overlapped each other vertically.
+  const HEADER_PX = 36
+  const ROW_PX = 24
+  const PARTITION_HEADER_PX = 24
+  const FOOTER_PX = 16
+  const GAP_X = 100
+  const GAP_Y = 80
+
+  const heightOf = (n: ErDiagramData['nodes'][number]) =>
+    HEADER_PX +
+    n.columns.length * ROW_PX +
+    (n.partition_keys.length > 0 ? PARTITION_HEADER_PX + n.partition_keys.length * ROW_PX : 0) +
+    FOOTER_PX
+
+  // First pass: compute the max height per row so a single tall table doesn't
+  // bleed into the row below it.
+  const rowHeights: number[] = []
+  data.nodes.forEach((n, i) => {
+    const row = Math.floor(i / COLS)
+    const h = heightOf(n)
+    rowHeights[row] = Math.max(rowHeights[row] ?? 0, h)
+  })
+
+  // Cumulative Y offset for each row (sum of previous row heights + gaps).
+  const rowOffsets: number[] = []
+  rowHeights.reduce((acc, h, idx) => {
+    rowOffsets[idx] = acc
+    return acc + h + GAP_Y
+  }, 0)
 
   const nodes: Node[] = data.nodes.map((n, i) => {
     const col = i % COLS
     const row = Math.floor(i / COLS)
-    const height = CARD_HEIGHT_BASE + (n.columns.length + n.partition_keys.length) * 20
     return {
       id: n.id,
       type: 'tableNode',
-      position: { x: col * (CARD_WIDTH + GAP_X), y: row * (height + GAP_Y) },
+      position: { x: col * (CARD_WIDTH + GAP_X), y: rowOffsets[row] },
       data: { name: n.name, columns: n.columns, partition_keys: n.partition_keys },
     }
   })
