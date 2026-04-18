@@ -108,19 +108,18 @@ export function BottomPanel({ onToggle }: { onToggle?: () => void }) {
     <div
       className="flex flex-col h-full"
       style={{ background: 'var(--bg-panel)', borderTop: '1px solid var(--border)' }}
-      onDoubleClick={(e) => {
-        // Double-click anywhere in the panel (tab bar or content) to collapse.
-        // Ignore clicks on interactive elements so we don't hijack their own
-        // double-click behaviour (e.g. text selection inside table cells, or
-        // double-firing the chevron close button).
-        const target = e.target as HTMLElement
-        if (target.closest('button, a, input, textarea, select')) return
-        onToggle?.()
-      }}
     >
       <div
         className="flex items-center gap-0 px-2 shrink-0"
         style={{ borderBottom: '1px solid var(--border)', cursor: 'default' }}
+        onDoubleClick={(e) => {
+          // Double-click the tab bar to collapse. Ignore double-clicks that
+          // land on interactive elements (like the chevron close button or
+          // the tab buttons) so we don't fight their own click handlers.
+          const target = e.target as HTMLElement
+          if (target.closest('button')) return
+          onToggle?.()
+        }}
       >
         {tabDefs.map(tab => (
           <button
