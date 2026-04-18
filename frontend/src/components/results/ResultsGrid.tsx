@@ -26,39 +26,51 @@ interface CellMenu {
 
 /** Append or inject a WHERE predicate into a SQL string. */
 function addWhereCondition(sql: string, col: string, value: string | null): string {
+  // Detect whether the query uses uppercase keywords so we can match
+  const upper = /\bSELECT\b/.test(sql) || /\bFROM\b/.test(sql)
+  const kw = (s: string) => upper ? s.toUpperCase() : s.toLowerCase()
+
+  // Only quote the column name if it contains spaces or non-word characters
+  const needsQuote = /[^a-zA-Z0-9_]/.test(col)
+  const colRef = needsQuote ? `"${col}"` : col
+
   // Build the predicate
   let predicate: string
   if (value === null) {
-    predicate = `"${col}" IS NULL`
+    predicate = `${colRef} ${kw('is null')}`
   } else if (/^-?\d+(\.\d+)?$/.test(value)) {
-    predicate = `"${col}" = ${value}`
+    predicate = `${colRef} = ${value}`
   } else {
-    predicate = `"${col}" = '${value.replace(/'/g, "''")}'`
+    predicate = `${colRef} = '${value.replace(/'/g, "''")}'`
   }
 
   // Strip trailing semicolons/whitespace to manipulate cleanly
   const trimmed = sql.trimEnd().replace(/;+$/, '').trimEnd()
 
-  // Case-insensitive check for existing WHERE
+  // Detect the leading indentation of the last line to match alignment
+  const lines = trimmed.split('\n')
+  const lastLineIndent = lines[lines.length - 1].match(/^(\s*)/)?.[1] ?? ''
+
   const whereRe = /\bWHERE\b/i
+  const clauseRe = /\b(ORDER\s+BY|GROUP\s+BY|HAVING|LIMIT)\b/i
+
   if (whereRe.test(trimmed)) {
-    // Append AND before ORDER BY / GROUP BY / HAVING / LIMIT if present,
-    // otherwise at end
-    const clauseRe = /\b(ORDER\s+BY|GROUP\s+BY|HAVING|LIMIT)\b/i
+    // WHERE already exists — append AND
     const match = clauseRe.exec(trimmed)
     if (match) {
-      return trimmed.slice(0, match.index) + `AND ${predicate}\n` + trimmed.slice(match.index) + ';'
+      const indent = trimmed.slice(0, match.index).match(/(\s*)$/)?.[1] ?? lastLineIndent
+      return trimmed.slice(0, match.index) + `${indent}${kw('and')} ${predicate}\n` + trimmed.slice(match.index) + ';'
     }
-    return trimmed + `\nAND ${predicate};`
+    return trimmed + `\n${lastLineIndent}${kw('and')} ${predicate};`
   }
 
   // No WHERE — insert before ORDER BY / GROUP BY / HAVING / LIMIT, or at end
-  const clauseRe = /\b(ORDER\s+BY|GROUP\s+BY|HAVING|LIMIT)\b/i
   const match = clauseRe.exec(trimmed)
   if (match) {
-    return trimmed.slice(0, match.index) + `WHERE ${predicate}\n` + trimmed.slice(match.index) + ';'
+    const indent = trimmed.slice(0, match.index).match(/(\s*)$/)?.[1] ?? lastLineIndent
+    return trimmed.slice(0, match.index) + `${indent}${kw('where')} ${predicate}\n` + trimmed.slice(match.index) + ';'
   }
-  return trimmed + `\nWHERE ${predicate};`
+  return trimmed + `\n${lastLineIndent}${kw('where')} ${predicate};`
 }
 
 export function ResultsGrid({ queryExecutionId, queryState, queryError, limitApplied, autoLimit, onCancel, tabId }: Props) {
