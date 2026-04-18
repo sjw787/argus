@@ -2,6 +2,7 @@ import { useRef, useState, useCallback, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { AgGridReact } from 'ag-grid-react'
 import type { ColDef, GridApi, CellContextMenuEvent } from 'ag-grid-community'
+import { format as formatSql } from 'sql-formatter'
 import { api } from '../../api/client'
 import { Download, Ban, Filter, ListFilter } from 'lucide-react'
 import { useThemeStore } from '../../stores/themeStore'
@@ -146,6 +147,7 @@ export function ResultsGrid({ queryExecutionId, queryState, queryError, limitApp
   const gridApiRef = useRef<GridApi | null>(null)
   const colTypeMapRef = useRef<Record<string, string>>({})
   const gridTheme = useThemeStore(s => s.theme === 'light' ? 'ag-theme-balham' : 'ag-theme-balham-dark')
+  const formatStyle = useThemeStore(s => s.formatStyle)
 
   const { data: config } = useQuery({ queryKey: ['config'], queryFn: api.getConfig, staleTime: 60000 })
   const allowDownload = config?.allow_download ?? true
@@ -199,9 +201,23 @@ export function ResultsGrid({ queryExecutionId, queryState, queryError, limitApp
       newSql = addWhereCondition(tab.sql, cellMenu.colId, cellMenu.value, cellMenu.colType)
     }
 
+    // Re-run through the formatter to keep the injected clause consistent with
+    // the rest of the query's style (keyword case, indentation, line breaks).
+    try {
+      newSql = formatSql(newSql, {
+        language: 'trino',
+        tabWidth: 2,
+        keywordCase: 'upper',
+        linesBetweenQueries: 2,
+        indentStyle: formatStyle,
+      })
+    } catch {
+      // If the formatter fails (e.g. partial SQL), keep the raw injection
+    }
+
     useEditorStore.getState().updateTab(tabId, { sql: newSql })
     setCellMenu(null)
-  }, [cellMenu, tabId, queryIndex])
+  }, [cellMenu, tabId, queryIndex, formatStyle])
 
   const { data: results, isFetching } = useQuery({
     queryKey: ['queryResults', queryExecutionId],
