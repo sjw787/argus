@@ -156,8 +156,7 @@ If a feature would require any of the above, flag it explicitly and discuss with
 
 ```bash
 # Backend
-source venv/bin/activate
-python main.py
+./start.sh
 
 # Frontend
 cd frontend && npm run dev
