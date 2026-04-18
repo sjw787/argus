@@ -1,4 +1,5 @@
 from __future__ import annotations
+import json
 import pytest
 import yaml
 from pathlib import Path
@@ -47,6 +48,73 @@ def test_workgroup_output_locations(tmp_path):
     config_file.write_text(yaml.dump(config_data))
     cfg = load_config(config_file)
     assert cfg.workgroups.output_locations["analytics_123456_prod"] == "s3://bucket/prod/"
+
+
+# ---------------------------------------------------------------------------
+# _load_from_env branches
+# ---------------------------------------------------------------------------
+
+def test_load_from_env_full_json(monkeypatch):
+    """ARGUS_CONFIG env var loads a full JSON config."""
+    payload = json.dumps({"aws": {"region": "ap-southeast-1"}})
+    monkeypatch.setenv("ARGUS_CONFIG", payload)
+    cfg = load_config()
+    assert cfg.aws.region == "ap-southeast-1"
+
+
+def test_load_from_env_individual_vars(monkeypatch):
+    """Individual ARGUS_* env vars are each applied."""
+    monkeypatch.setenv("ARGUS_REGION", "ca-central-1")
+    monkeypatch.setenv("ARGUS_PROFILE", "myprofile")
+    monkeypatch.setenv("ARGUS_OUTPUT_LOCATION", "s3://env-bucket/")
+    monkeypatch.setenv("ARGUS_AUTH_MODE", "none")
+    cfg = load_config()
+    assert cfg.aws.region == "ca-central-1"
+    assert cfg.aws.profile == "myprofile"
+    assert cfg.defaults.output_location == "s3://env-bucket/"
+    assert cfg.auth_mode == "none"
+
+
+def test_load_config_returns_cached_result(tmp_path):
+    """Second call returns the cached config without re-reading the file."""
+    config_file = tmp_path / "test_config.yaml"
+    config_file.write_text(yaml.dump({"aws": {"region": "eu-north-1"}}))
+    cfg1 = load_config(config_file)
+    # Overwrite the file — cache should mean the second call still returns original
+    config_file.write_text(yaml.dump({"aws": {"region": "us-west-2"}}))
+    cfg2 = load_config()
+    assert cfg1 is cfg2
+    assert cfg2.aws.region == "eu-north-1"
+
+
+# ---------------------------------------------------------------------------
+# Lambda _load_overrides / _save_overrides
+# ---------------------------------------------------------------------------
+
+def test_load_overrides_exception_returns_empty(monkeypatch):
+    """If the session store raises during override load, _load_overrides returns {}."""
+    from argus.core import config as cfgmod
+
+    monkeypatch.setenv("LAMBDA_RUNTIME", "1")
+    monkeypatch.setenv("ARGUS_SESSION_STORE", "memory")
+
+    # Make get_persistent raise
+    import argus.core.session_store as sess
+    original = sess.get_persistent
+    sess.get_persistent = lambda key: (_ for _ in ()).throw(RuntimeError("boom"))
+    try:
+        result = cfgmod._load_overrides()
+    finally:
+        sess.get_persistent = original
+    assert result == {}
+
+
+def test_save_overrides_noop_outside_lambda(monkeypatch):
+    """_save_overrides is a no-op when not running on Lambda."""
+    from argus.core import config as cfgmod
+    monkeypatch.delenv("LAMBDA_RUNTIME", raising=False)
+    # Should not raise even with empty overrides
+    cfgmod._save_overrides({"workgroups": {}})
 
 
 def test_lambda_mode_persists_overrides_via_session_store(monkeypatch):
