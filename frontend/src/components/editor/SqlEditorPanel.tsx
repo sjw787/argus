@@ -179,9 +179,25 @@ export function SqlEditorPanel({ tabId }: Props) {
     }
   }, [tabId, activeTabId, tab?.database])
 
-  const handleEditorMount: OnMount = (editor) => {
+  const handleEditorMount: OnMount = (editor, monacoNs) => {
     editorRef.current = editor
     if (monaco && sqlDiagnostics) registerSqlDiagnostics(monaco, editor)
+
+    // Belt-and-suspenders: explicitly bind Space (with no modifiers) to
+    // 'type a space' inside the editor, overriding any keybinding context
+    // (suggestWidgetVisible, inlineSuggestionVisible, hasSnippet, etc.) that
+    // could otherwise consume the keystroke. The options-level
+    // acceptSuggestionOnCommitCharacter:false should already be enough, but
+    // multiple Monaco "accept" actions are bound to Space in some contexts
+    // (snippet jumps, inline suggestion accept, parameter hint cycle), and
+    // the safe way to disable them all is a single explicit bind here.
+    const ns = monacoNs ?? monaco
+    if (ns) {
+      // KeyCode.Space = 10
+      editor.addCommand(ns.KeyCode.Space, () => {
+        editor.trigger('keyboard', 'type', { text: ' ' })
+      })
+    }
   }
 
   // Enable/disable diagnostics when setting changes
@@ -572,6 +588,9 @@ export function SqlEditorPanel({ tabId }: Props) {
               // (especially after keywords like SELECT, FROM).
               acceptSuggestionOnCommitCharacter: false,
               acceptSuggestionOnEnter: 'on',
+              tabCompletion: 'off',
+              inlineSuggest: { enabled: false },
+              snippetSuggestions: 'none',
             }}
           />
         </Allotment.Pane>
