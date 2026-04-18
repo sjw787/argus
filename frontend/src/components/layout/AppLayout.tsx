@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Allotment } from 'allotment'
 import 'allotment/dist/style.css'
 import { DatabaseNavigator } from '../navigator/DatabaseNavigator'
@@ -11,8 +11,8 @@ import { useThemeStore } from '../../stores/themeStore'
 export function AppLayout() {
   const tabs = useEditorStore(s => s.tabs)
   const addTab = useEditorStore(s => s.addTab)
-  const showHistoryDefault = useThemeStore(s => s.showHistoryDefault)
-  const [showHistory, setShowHistory] = useState(showHistoryDefault)
+  const showHistory = useThemeStore(s => s.showHistoryDefault)
+  const setShowHistory = useThemeStore(s => s.setShowHistoryDefault)
 
   useEffect(() => {
     if (tabs.length === 0) addTab()
@@ -34,7 +34,7 @@ export function AppLayout() {
                     <EditorArea />
                   </Allotment.Pane>
                   <Allotment.Pane minSize={120} maxSize={400} visible={showHistory}>
-                    <BottomPanel onToggle={() => setShowHistory(v => !v)} />
+                    <BottomPanel onToggle={() => setShowHistory(!showHistory)} />
                   </Allotment.Pane>
                 </Allotment>
               </div>
