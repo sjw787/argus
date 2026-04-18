@@ -39,6 +39,11 @@ jobs:
         uses: codecov/codecov-action@v6
         with:
           files: ./coverage.xml
+          # Use the coverage.xml that pytest just wrote with --cov=argus, instead
+          # of letting the codecov CLI auto-discover and regenerate from .coverage
+          # with different settings (which previously produced a much smaller XML
+          # and made the dashboard show ~45% instead of the real ~61%).
+          disable_search: true
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
 
