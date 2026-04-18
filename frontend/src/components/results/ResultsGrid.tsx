@@ -71,9 +71,10 @@ function addWhereCondition(sql: string, col: string, value: string | null, colTy
   // Strip trailing semicolons/whitespace to manipulate cleanly
   const trimmed = sql.trimEnd().replace(/;+$/, '').trimEnd()
 
-  // Detect the leading indentation of the last line to match alignment
-  const lines = trimmed.split('\n')
-  const lastLineIndent = lines[lines.length - 1].match(/^(\s*)/)?.[1] ?? ''
+  // Detect indentation from the clause keyword level (FROM/WHERE/ORDER BY),
+  // not from the last line which may be a JOIN or continuation
+  const clauseIndentMatch = trimmed.match(/^([ \t]*)(?:FROM|WHERE|ORDER\s+BY|GROUP\s+BY|HAVING|LIMIT)\b/im)
+  const clauseIndent = clauseIndentMatch?.[1] ?? ''
 
   const whereRe = /\bWHERE\b/i
   const clauseRe = /\b(ORDER\s+BY|GROUP\s+BY|HAVING|LIMIT)\b/i
@@ -92,7 +93,11 @@ function addWhereCondition(sql: string, col: string, value: string | null, colTy
     }
 
     // Case 2: col = value exists — convert to col IN (old, new)
-    const eqRe = new RegExp(`${escapedCol}\\s*=\\s*('(?:[^']|'')*'|-?\\d+(?:\\.\\d+)?)`, 'i')
+    // Match quoted strings, numbers, and keyword-prefixed literals like DATE '...' / TIMESTAMP '...'
+    const eqRe = new RegExp(
+      `${escapedCol}\\s*=\\s*((?:DATE|TIMESTAMP|TIME)\\s+'(?:[^']|'')*'|'(?:[^']|'')*'|-?\\d+(?:\\.\\d+)?)`,
+      'i'
+    )
     const eqMatch = eqRe.exec(trimmed)
     if (eqMatch) {
       const existingVal = eqMatch[1]
@@ -112,26 +117,24 @@ function addWhereCondition(sql: string, col: string, value: string | null, colTy
   }
 
   if (whereRe.test(trimmed)) {
-    // WHERE already exists — append AND
+    // WHERE already exists — insert AND before any trailing clause, or append
     const match = clauseRe.exec(trimmed)
     if (match) {
       const before = trimmed.slice(0, match.index).trimEnd()
-      const after = trimmed.slice(match.index)
-      const indent = after.match(/^([ \t]*)/)?.[1] ?? lastLineIndent
-      return `${before}\n${indent}${kw('and')} ${predicate}\n${indent}` + after.trimStart() + ';'
+      const after = trimmed.slice(match.index).trimStart()
+      return `${before}\n${clauseIndent}${kw('and')} ${predicate}\n${clauseIndent}${after};`
     }
-    return trimmed + `\n${lastLineIndent}${kw('and')} ${predicate};`
+    return `${trimmed}\n${clauseIndent}${kw('and')} ${predicate};`
   }
 
   // No WHERE — insert before ORDER BY / GROUP BY / HAVING / LIMIT, or at end
   const match = clauseRe.exec(trimmed)
   if (match) {
     const before = trimmed.slice(0, match.index).trimEnd()
-    const after = trimmed.slice(match.index)
-    const indent = after.match(/^([ \t]*)/)?.[1] ?? lastLineIndent
-    return `${before}\n${indent}${kw('where')} ${predicate}\n${indent}` + after.trimStart() + ';'
+    const after = trimmed.slice(match.index).trimStart()
+    return `${before}\n${clauseIndent}${kw('where')} ${predicate}\n${clauseIndent}${after};`
   }
-  return trimmed + `\n${lastLineIndent}${kw('where')} ${predicate};`
+  return `${trimmed}\n${clauseIndent}${kw('where')} ${predicate};`
 }
 
 export function ResultsGrid({ queryExecutionId, queryState, queryError, limitApplied, autoLimit, onCancel, tabId }: Props) {
