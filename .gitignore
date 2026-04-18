@@ -59,3 +59,4 @@ frontend/.env.*.local
 infra/.terraform/
 infra/.terraform.lock.hcl
 infra/terraform.tfstate*
+test-results/
