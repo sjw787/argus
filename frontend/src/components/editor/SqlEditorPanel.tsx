@@ -11,56 +11,8 @@ import { useQueryNamesStore, extractSqlComment } from '../../stores/queryNamesSt
 import { registerSqlCompletion, unregisterSqlCompletion, setActiveDatabase } from '../../lib/sqlCompletion'
 import { registerSqlDiagnostics, unregisterSqlDiagnostics } from '../../lib/sqlDiagnostics'
 import { ResultsGrid } from '../results/ResultsGrid'
+import { splitSqlStatements } from '../../utils/sql'
 import { Play, ChevronDown, Search, WandSparkles, Loader } from 'lucide-react'
-
-/** Split SQL text into individual statements on top-level `;`, ignoring `;` inside strings or comments. */
-function splitSqlStatements(sql: string): string[] {
-  const stmts: string[] = []
-  let cur = ''
-  let i = 0
-  while (i < sql.length) {
-    const ch = sql[i]
-    // Single-line comment: skip to end of line
-    if (ch === '-' && sql[i + 1] === '-') {
-      const end = sql.indexOf('\n', i)
-      cur += end === -1 ? sql.slice(i) : sql.slice(i, end + 1)
-      i = end === -1 ? sql.length : end + 1
-      continue
-    }
-    // Block comment
-    if (ch === '/' && sql[i + 1] === '*') {
-      const end = sql.indexOf('*/', i + 2)
-      cur += end === -1 ? sql.slice(i) : sql.slice(i, end + 2)
-      i = end === -1 ? sql.length : end + 2
-      continue
-    }
-    // Single-quoted string (handles '' escapes)
-    if (ch === "'") {
-      let j = i + 1
-      while (j < sql.length) {
-        if (sql[j] === "'" && sql[j + 1] === "'") { j += 2; continue }
-        if (sql[j] === "'") { j++; break }
-        j++
-      }
-      cur += sql.slice(i, j)
-      i = j
-      continue
-    }
-    // Statement separator
-    if (ch === ';') {
-      const stmt = cur.trim()
-      if (stmt) stmts.push(stmt)
-      cur = ''
-      i++
-      continue
-    }
-    cur += ch
-    i++
-  }
-  const last = cur.trim()
-  if (last) stmts.push(last)
-  return stmts
-}
 
 
 const PAGE_LIMIT = 50
@@ -553,6 +505,7 @@ export function SqlEditorPanel({ tabId }: Props) {
                     limitApplied={exec.limitApplied}
                     autoLimit={autoLimit}
                     tabId={tabId}
+                    queryIndex={tab.activeResultIdx ?? 0}
                     onCancel={(exec.state === 'RUNNING' || exec.state === 'QUEUED') ? () => handleCancel(exec.id) : undefined}
                   />
                 }

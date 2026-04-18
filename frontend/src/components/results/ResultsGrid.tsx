@@ -6,6 +6,7 @@ import { api } from '../../api/client'
 import { Download, Ban, Filter, ListFilter } from 'lucide-react'
 import { useThemeStore } from '../../stores/themeStore'
 import { useEditorStore } from '../../stores/editorStore'
+import { splitSqlStatements } from '../../utils/sql'
 
 interface Props {
   queryExecutionId: string
@@ -15,6 +16,9 @@ interface Props {
   autoLimit?: number
   onCancel?: () => void
   tabId?: string
+  /** Index of this result within a multi-query tab (0-based). Used to target
+   *  the correct statement when injecting WHERE conditions. */
+  queryIndex?: number
 }
 
 interface CellMenu {
@@ -136,7 +140,7 @@ function addWhereCondition(sql: string, col: string, value: string | null, colTy
   return `${trimmed}\n${clauseIndent}${kw('where')} ${predicate};`
 }
 
-export function ResultsGrid({ queryExecutionId, queryState, queryError, limitApplied, autoLimit, onCancel, tabId }: Props) {
+export function ResultsGrid({ queryExecutionId, queryState, queryError, limitApplied, autoLimit, onCancel, tabId, queryIndex }: Props) {
   const [isExporting, setIsExporting] = useState(false)
   const [cellMenu, setCellMenu] = useState<CellMenu | null>(null)
   const gridApiRef = useRef<GridApi | null>(null)
@@ -179,10 +183,22 @@ export function ResultsGrid({ queryExecutionId, queryState, queryError, limitApp
     if (!cellMenu || !tabId) return
     const tab = useEditorStore.getState().tabs.find(t => t.id === tabId)
     if (!tab) return
-    const newSql = addWhereCondition(tab.sql, cellMenu.colId, cellMenu.value, cellMenu.colType)
+
+    let newSql: string
+    if (queryIndex !== undefined) {
+      // Multi-query tab — only modify the statement that produced these results
+      const stmts = splitSqlStatements(tab.sql)
+      const target = stmts[queryIndex]
+      if (target === undefined) return
+      stmts[queryIndex] = addWhereCondition(target, cellMenu.colId, cellMenu.value, cellMenu.colType)
+      newSql = stmts.join('\n\n')
+    } else {
+      newSql = addWhereCondition(tab.sql, cellMenu.colId, cellMenu.value, cellMenu.colType)
+    }
+
     useEditorStore.getState().updateTab(tabId, { sql: newSql })
     setCellMenu(null)
-  }, [cellMenu, tabId])
+  }, [cellMenu, tabId, queryIndex])
 
   const { data: results, isFetching } = useQuery({
     queryKey: ['queryResults', queryExecutionId],
