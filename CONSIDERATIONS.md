@@ -10,7 +10,7 @@ The premise: *AI can write the code, but a human still has to own the outcome.* 
 
 A full test suite covers the core application logic. Tests were written alongside the code and validated against the real application behaviour.
 
-**90 tests passing across 9 test modules:**
+**154 tests passing across 9 test modules:**
 
 | Module | What It Covers |
 |--------|---------------|
@@ -31,7 +31,7 @@ PYTHONPATH=src python -m pytest tests/ -q
 # 90 passed
 ```
 
-Current line coverage: **46%** (target: 87%). Coverage is enforced by a pre-push ratchet hook — it can only go up between pushes.
+Current line coverage: **51%** (target: 87%). Coverage is enforced by a pre-push ratchet hook — it can only go up between pushes.
 
 ---
 
