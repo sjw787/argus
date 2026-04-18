@@ -226,6 +226,14 @@ export function SqlEditorPanel({ tabId }: Props) {
     setPendingInsert(null)
   }, [pendingInsert, activeTabId, tabId, setPendingInsert])
 
+  // Auto-run query when a tab opens with pendingRun: true (e.g., "Select top 100 rows")
+  useEffect(() => {
+    if (tabId !== activeTabId || !tab?.pendingRun) return
+    updateTab(tabId, { pendingRun: false })
+    handleRun()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabId, activeTabId, tab?.pendingRun])
+
   if (!tab) return null
 
   const handleRun = async () => {

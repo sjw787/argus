@@ -23,6 +23,8 @@ export interface EditorTab {
   // Multi-query support
   queryExecutions?: QueryExecution[]
   activeResultIdx?: number
+  // Set to true to auto-execute the query when the tab first becomes active
+  pendingRun?: boolean
 }
 
 interface EditorStore {
@@ -30,7 +32,7 @@ interface EditorStore {
   activeTabId: string | null
   pendingInsert: string | null
   addTab: (database?: string) => void
-  openTab: (opts: { title: string; sql: string; database: string }) => void
+  openTab: (opts: { title: string; sql: string; database: string; pendingRun?: boolean }) => void
   openErDiagramTab: (database: string) => void
   closeTab: (id: string) => void
   closeOtherTabs: (id: string) => void
@@ -66,9 +68,9 @@ export const useEditorStore = create<EditorStore>()(
         set(state => ({ tabs: [...state.tabs, newTab], activeTabId: id }))
       },
 
-      openTab: ({ title, sql, database }) => {
+      openTab: ({ title, sql, database, pendingRun }) => {
         const id = newTabId()
-        const newTab: EditorTab = { id, title, sql, database, isLoading: false }
+        const newTab: EditorTab = { id, title, sql, database, isLoading: false, pendingRun }
         set(state => ({ tabs: [...state.tabs, newTab], activeTabId: id }))
       },
 

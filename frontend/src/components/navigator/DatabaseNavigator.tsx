@@ -202,7 +202,7 @@ export function DatabaseNavigator() {
       actions.push({
         label: 'Select top 100 rows',
         icon: <Play size={13} />,
-        onClick: () => openTab({ title: tableName, sql: buildSelectTop100(qualifiedName, formatStyle), database: dbName }),
+        onClick: () => openTab({ title: tableName, sql: buildSelectTop100(qualifiedName, formatStyle), database: dbName, pendingRun: true }),
       })
       actions.push({ separator: true, label: '', onClick: () => {} })
     }
@@ -250,7 +250,7 @@ export function DatabaseNavigator() {
       <div className="flex-1 overflow-auto scrollbar-thin py-1">
         {showInformationSchema && (
           <InformationSchemaNode
-            onOpenTab={sql => openTab({ title: 'information_schema', sql, database: 'information_schema' })}
+            onOpenTab={sql => openTab({ title: 'information_schema', sql, database: 'information_schema', pendingRun: true })}
             onInsert={setPendingInsert}
           />
         )}
