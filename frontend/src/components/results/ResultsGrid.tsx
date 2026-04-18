@@ -25,6 +25,12 @@ interface CellMenu {
 }
 
 /** Append or inject a WHERE predicate into a SQL string. */
+function formatSqlValue(value: string | null): string | null {
+  if (value === null) return null
+  if (/^-?\d+(\.\d+)?$/.test(value)) return value
+  return `'${value.replace(/'/g, "''")}'`
+}
+
 function addWhereCondition(sql: string, col: string, value: string | null): string {
   // Detect whether the query uses uppercase keywords so we can match
   const upper = /\bSELECT\b/.test(sql) || /\bFROM\b/.test(sql)
@@ -33,16 +39,9 @@ function addWhereCondition(sql: string, col: string, value: string | null): stri
   // Only quote the column name if it contains spaces or non-word characters
   const needsQuote = /[^a-zA-Z0-9_]/.test(col)
   const colRef = needsQuote ? `"${col}"` : col
+  const escapedCol = colRef.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
-  // Build the predicate
-  let predicate: string
-  if (value === null) {
-    predicate = `${colRef} ${kw('is null')}`
-  } else if (/^-?\d+(\.\d+)?$/.test(value)) {
-    predicate = `${colRef} = ${value}`
-  } else {
-    predicate = `${colRef} = '${value.replace(/'/g, "''")}'`
-  }
+  const formattedValue = formatSqlValue(value)
 
   // Strip trailing semicolons/whitespace to manipulate cleanly
   const trimmed = sql.trimEnd().replace(/;+$/, '').trimEnd()
@@ -53,6 +52,39 @@ function addWhereCondition(sql: string, col: string, value: string | null): stri
 
   const whereRe = /\bWHERE\b/i
   const clauseRe = /\b(ORDER\s+BY|GROUP\s+BY|HAVING|LIMIT)\b/i
+
+  // If WHERE exists and value is non-null, try to merge into an existing condition
+  // for the same column rather than adding a separate AND
+  if (whereRe.test(trimmed) && formattedValue !== null) {
+    // Case 1: col IN (...) already exists — append to the IN list
+    const inRe = new RegExp(`(${escapedCol}\\s+IN\\s*\\()([^)]*)(\\))`, 'i')
+    const inMatch = inRe.exec(trimmed)
+    if (inMatch) {
+      const updated = trimmed.replace(inRe, (_, open, list, close) =>
+        `${open}${list.trimEnd()}, ${formattedValue}${close}`
+      )
+      return updated + ';'
+    }
+
+    // Case 2: col = value exists — convert to col IN (old, new)
+    const eqRe = new RegExp(`${escapedCol}\\s*=\\s*('(?:[^']|'')*'|-?\\d+(?:\\.\\d+)?)`, 'i')
+    const eqMatch = eqRe.exec(trimmed)
+    if (eqMatch) {
+      const existingVal = eqMatch[1]
+      const updated = trimmed.replace(eqRe,
+        `${colRef} ${kw('in')} (${existingVal}, ${formattedValue})`
+      )
+      return updated + ';'
+    }
+  }
+
+  // Build a simple equality/null predicate for the AND/WHERE path
+  let predicate: string
+  if (value === null) {
+    predicate = `${colRef} ${kw('is null')}`
+  } else {
+    predicate = `${colRef} = ${formattedValue}`
+  }
 
   if (whereRe.test(trimmed)) {
     // WHERE already exists — append AND
