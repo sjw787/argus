@@ -30,6 +30,7 @@ def test_get_config_info_returns_expected_fields():
     assert data["region"] == "us-east-1"
     assert "workgroup_output_locations" in data
     assert "max_results" in data
+    assert data["allow_download"] is True
 
 
 def test_get_assignments_empty():

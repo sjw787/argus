@@ -147,6 +147,9 @@ export function ResultsGrid({ queryExecutionId, queryState, queryError, limitApp
   const colTypeMapRef = useRef<Record<string, string>>({})
   const gridTheme = useThemeStore(s => s.theme === 'light' ? 'ag-theme-balham' : 'ag-theme-balham-dark')
 
+  const { data: config } = useQuery({ queryKey: ['config'], queryFn: api.getConfig, staleTime: 60000 })
+  const allowDownload = config?.allow_download ?? true
+
   // Close context menu on outside click
   useEffect(() => {
     if (!cellMenu) return
@@ -308,7 +311,7 @@ export function ResultsGrid({ queryExecutionId, queryState, queryError, limitApp
           </span>
         )}
         <div className="ml-auto flex items-center gap-2">
-          {['csv', 'json', 'xlsx', 'parquet'].map(fmt => (
+          {allowDownload && ['csv', 'json', 'xlsx', 'parquet'].map(fmt => (
             <button
               key={fmt}
               onClick={() => handleExport(fmt)}

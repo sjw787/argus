@@ -197,6 +197,7 @@ export interface ConfigInfo {
   max_results: number
   query_timeout_seconds: number
   locked_settings: string[]
+  allow_download: boolean
 }
 
 // Auth / SSO types

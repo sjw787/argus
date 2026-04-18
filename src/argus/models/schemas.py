@@ -33,3 +33,7 @@ class AppConfig(BaseModel):
             "showInformationSchema, formatStyle, autoLimit"
         ),
     )
+    allow_download: bool = Field(
+        default=True,
+        description="When false, the download/export buttons are hidden for all users.",
+    )

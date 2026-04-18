@@ -22,6 +22,7 @@ def get_config_info(config: Annotated[AppConfig, Depends(get_config)]):
         max_results=config.defaults.max_results,
         query_timeout_seconds=config.defaults.query_timeout_seconds,
         locked_settings=config.locked_settings,
+        allow_download=config.allow_download,
     )
 
 

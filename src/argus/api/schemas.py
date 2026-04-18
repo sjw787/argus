@@ -208,6 +208,7 @@ class ConfigInfo(BaseModel):
     max_results: int
     query_timeout_seconds: int
     locked_settings: list[str] = []
+    allow_download: bool = True
 
 
 # ── Export ────────────────────────────────────────────────────────────────────

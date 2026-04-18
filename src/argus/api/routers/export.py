@@ -6,8 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 
 from argus.api.schemas import ExportRequest
-from argus.api.dependencies import get_athena_service
+from argus.api.dependencies import get_athena_service, get_config
 from argus.services.athena_service import AthenaService
+from argus.models.schemas import AppConfig
 
 router = APIRouter(prefix="/export", tags=["export"])
 
@@ -58,7 +59,11 @@ def export_results(
     query_id: str,
     body: ExportRequest,
     svc: Annotated[AthenaService, Depends(get_athena_service)],
+    config: Annotated[AppConfig, Depends(get_config)],
 ):
+    if not config.allow_download:
+        raise HTTPException(status_code=403, detail="Downloads have been disabled by the administrator.")
+
     fmt = body.format.lower()
     if fmt not in MIME_TYPES:
         raise HTTPException(status_code=400, detail=f"Unsupported format: {fmt}. Use csv, json, xlsx, or parquet.")
