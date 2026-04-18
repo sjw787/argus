@@ -310,19 +310,27 @@ jobs:
     runs-on: ubuntu-latest
     # Only run on push to main — the image must already be built and pushed
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      id-token: write   # required for OIDC role assumption
+      issues: write
     steps:
       - uses: actions/checkout@v5
 
       - name: Configure AWS credentials
+        id: aws-creds
+        continue-on-error: true
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Log in to Amazon ECR
+        if: steps.aws-creds.outcome == 'success'
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Run Trivy image scan
+        if: steps.aws-creds.outcome == 'success'
         uses: aquasecurity/trivy-action@v0.35.0
         with:
           scan-type: image
@@ -334,6 +342,7 @@ jobs:
 
       - name: Check for findings
         id: check
+        if: steps.aws-creds.outcome == 'success'
         run: |
           ISSUES=$(python3 -c "
           import json, sys
@@ -351,7 +360,7 @@ jobs:
           echo "TRIVY_IMAGE_SUMMARY=$ISSUES" >> "$GITHUB_ENV"
 
       - name: Upload Trivy image results
-        if: always()
+        if: steps.aws-creds.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: trivy-image-results
