@@ -22,16 +22,41 @@ interface CellMenu {
   y: number
   colId: string
   value: string | null
+  colType?: string
 }
 
 /** Append or inject a WHERE predicate into a SQL string. */
-function formatSqlValue(value: string | null): string | null {
+/** Athena types that are stored as unquoted literals in SQL. */
+const NUMERIC_TYPES = new Set([
+  'tinyint', 'smallint', 'int', 'integer', 'bigint',
+  'float', 'real', 'double', 'decimal',
+])
+const BOOLEAN_TYPES = new Set(['boolean'])
+/** Types that need date/timestamp literals — still quoted in Athena SQL. */
+const TEMPORAL_TYPES = new Set(['date', 'timestamp', 'time'])
+
+function formatSqlValue(value: string | null, colType?: string): string | null {
   if (value === null) return null
+  const baseType = colType?.toLowerCase().replace(/\(.*\)/, '').trim()
+  if (baseType && BOOLEAN_TYPES.has(baseType)) {
+    // true/false unquoted
+    const lower = value.toLowerCase()
+    return lower === 'true' || lower === '1' ? 'true' : 'false'
+  }
+  if (baseType && NUMERIC_TYPES.has(baseType)) {
+    return value
+  }
+  if (baseType && TEMPORAL_TYPES.has(baseType)) {
+    // DATE 'YYYY-MM-DD' or TIMESTAMP 'YYYY-MM-DD HH:MM:SS'
+    const prefix = baseType === 'date' ? 'DATE' : baseType === 'time' ? 'TIME' : 'TIMESTAMP'
+    return `${prefix} '${value.replace(/'/g, "''")}'`
+  }
+  // Fallback: heuristic for when no type metadata is available
   if (/^-?\d+(\.\d+)?$/.test(value)) return value
   return `'${value.replace(/'/g, "''")}'`
 }
 
-function addWhereCondition(sql: string, col: string, value: string | null): string {
+function addWhereCondition(sql: string, col: string, value: string | null, colType?: string): string {
   // Detect whether the query uses uppercase keywords so we can match
   const upper = /\bSELECT\b/.test(sql) || /\bFROM\b/.test(sql)
   const kw = (s: string) => upper ? s.toUpperCase() : s.toLowerCase()
@@ -41,7 +66,7 @@ function addWhereCondition(sql: string, col: string, value: string | null): stri
   const colRef = needsQuote ? `"${col}"` : col
   const escapedCol = colRef.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
-  const formattedValue = formatSqlValue(value)
+  const formattedValue = formatSqlValue(value, colType)
 
   // Strip trailing semicolons/whitespace to manipulate cleanly
   const trimmed = sql.trimEnd().replace(/;+$/, '').trimEnd()
@@ -109,6 +134,7 @@ export function ResultsGrid({ queryExecutionId, queryState, queryError, limitApp
   const [isExporting, setIsExporting] = useState(false)
   const [cellMenu, setCellMenu] = useState<CellMenu | null>(null)
   const gridApiRef = useRef<GridApi | null>(null)
+  const colTypeMapRef = useRef<Record<string, string>>({})
   const gridTheme = useThemeStore(s => s.theme === 'light' ? 'ag-theme-balham' : 'ag-theme-balham-dark')
 
   // Close context menu on outside click
@@ -123,11 +149,13 @@ export function ResultsGrid({ queryExecutionId, queryState, queryError, limitApp
   const handleCellContextMenu = useCallback((e: CellContextMenuEvent) => {
     const evt = e.event as MouseEvent
     evt.preventDefault()
+    const colId = e.column.getColId()
     setCellMenu({
       x: evt.clientX,
       y: evt.clientY,
-      colId: e.column.getColId(),
+      colId,
       value: e.value ?? null,
+      colType: colTypeMapRef.current[colId],
     })
   }, [])
 
@@ -145,7 +173,7 @@ export function ResultsGrid({ queryExecutionId, queryState, queryError, limitApp
     if (!cellMenu || !tabId) return
     const tab = useEditorStore.getState().tabs.find(t => t.id === tabId)
     if (!tab) return
-    const newSql = addWhereCondition(tab.sql, cellMenu.colId, cellMenu.value)
+    const newSql = addWhereCondition(tab.sql, cellMenu.colId, cellMenu.value, cellMenu.colType)
     useEditorStore.getState().updateTab(tabId, { sql: newSql })
     setCellMenu(null)
   }, [cellMenu, tabId])
@@ -217,6 +245,11 @@ export function ResultsGrid({ queryExecutionId, queryState, queryError, limitApp
     )
   }
 
+  // Build column type map whenever results arrive
+  colTypeMapRef.current = Object.fromEntries(
+    results.columns.map(col => [col.name, col.type ?? ''])
+  )
+
   const colDefs: ColDef[] = results.columns.map(col => ({
     headerName: col.name,
     field: col.name,
@@ -225,6 +258,7 @@ export function ResultsGrid({ queryExecutionId, queryState, queryError, limitApp
     filter: true,
     minWidth: 80,
     flex: 1,
+    headerTooltip: col.type ?? undefined,
   }))
 
   const rowData = results.rows.map(row => {
