@@ -45,9 +45,8 @@ A browser-based database manager for **AWS Athena** — inspired by DBeaver. Bro
 - Auth mode is runtime-configurable; the frontend adapts automatically
 
 ### Workgroup Routing
-- Configurable naming schema: extracts client IDs and environments from database names
+- Explicit database → workgroup assignments via the UI
 - Automatically routes queries to the correct Athena workgroup and S3 output location
-- Manual overrides available per database
 
 ### Settings
 - Dark / light theme
@@ -160,27 +159,23 @@ defaults:
 #   - formatStyle
 # Valid keys: theme, sqlAutocomplete, sqlDiagnostics, showHistoryDefault,
 #             showInformationSchema, formatStyle, autoLimit
-
-# Optional: auto-route databases to workgroups by name pattern
-naming_schemas:
-  default:
-    description: "Standard schema: <purpose>_<clientid>_<environment>"
-    pattern: "{purpose}_{client_id}_{environment}"
-    client_id_regex: '\d{6}|\d{9}'
-    workgroup_pattern: "{purpose}_{client_id}_{environment}"
-
-active_schema: default
 ```
 
 ### Workgroup routing
 
-If your databases follow a naming convention (e.g. `analytics_123456_prod`), Argus for Athena automatically routes queries to the correct workgroup:
+Assign databases to workgroups through the UI (**Settings → Workgroup Assignments**) or directly in `argus.yaml`:
 
-| Database | Resolved workgroup |
-|---|---|
-| `analytics_123456_prod` | `analytics_123456_prod` |
-| `reporting_789012_dev` | `reporting_789012_dev` |
-| `other_db` | *(default output location)* |
+```yaml
+workgroups:
+  assignments:
+    analytics_123456_prod: wg_123456_prod
+    analytics_123456_dev:  wg_123456_dev
+  output_locations:
+    wg_123456_prod: s3://my-bucket/123456/prod/
+    wg_123456_dev:  s3://my-bucket/123456/dev/
+```
+
+Databases without an explicit assignment fall back to Athena's `primary` workgroup.
 
 ---
 

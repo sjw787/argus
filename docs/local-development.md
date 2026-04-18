@@ -87,24 +87,13 @@ aws:
   region: us-east-1       # AWS region for Athena and Glue calls. Default: us-east-1
   profile: null           # Named AWS profile from ~/.aws/config. null = default credential chain
 
-naming_schemas:
-  # Define one or more schemas for auto-routing databases to workgroups.
-  # Each schema extracts parts of a database name and maps them to a workgroup.
-  default:
-    description: "Standard schema: <purpose>_<clientid>_<environment>"
-    pattern: "{purpose}_{client_id}_{environment}"        # Named capture groups
-    client_id_regex: '\d{6}|\d{9}'                        # Regex to identify client IDs
-    workgroup_pattern: "{purpose}_{client_id}_{environment}"  # Workgroup name template
-
-active_schema: default    # Which naming_schema to use for workgroup resolution
-
 workgroups:
   output_locations:
     # Map workgroup name → S3 URI. Queries routed to that workgroup use this output path.
     # analytics_123456_prod: s3://my-bucket/123456/prod/
     # analytics_123456_dev: s3://my-bucket/123456/dev/
   assignments:
-    # Explicit database → workgroup overrides (bypass naming schema).
+    # Explicit database → workgroup overrides.
     # my_special_db: my-workgroup
 
 defaults:

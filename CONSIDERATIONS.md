@@ -19,9 +19,8 @@ A full test suite covers the core application logic. Tests were written alongsid
 | `test_api_workgroups.py` | Workgroup listing, creation, client-workgroup assignment |
 | `test_athena_service.py` | Athena service layer (start, poll, fetch results) |
 | `test_catalog_service.py` | Glue catalog service layer |
-| `test_workgroup_service.py` | Workgroup service and client-ID matching logic |
+| `test_workgroup_service.py` | Workgroup service (list, get, create, delete) |
 | `test_config.py` | Configuration loading, env-var overrides, and Lambda DynamoDB persistence |
-| `test_naming.py` | Client naming schema parsing and workgroup resolution |
 | `test_api_config.py` | Config API endpoints and workgroup assignment persistence |
 
 Tests use `pytest` with `unittest.mock` to isolate AWS API calls. No real AWS credentials or network access are required to run the suite.

@@ -61,7 +61,7 @@ Argus sends user-supplied values to AWS APIs. It does not construct SQL server-s
 
 This is the core security concern of the application. See [docs/workgroup-routing.md](docs/workgroup-routing.md) for the full invariant list.
 
-- [ ] **No implicit workgroup inference**: A database with no explicit assignment must NOT be silently routed to a client workgroup derived from its name. The naming-schema auto-resolution code exists for backwards compatibility but must not be wired to query execution for new paths.
+- [ ] **No implicit workgroup inference**: A database with no explicit assignment must NOT be silently routed to a client workgroup derived from its name. Assignments are always explicit (`workgroups.assignments` dict); there is no pattern-based auto-resolution.
 - [ ] **Output location isolation**: A client workgroup's S3 output location must be looked up from `workgroups.output_locations[wg]`, not from `defaults.output_location`. The default is only for the `primary` / non-client workgroup. Verify `_resolve_output` checks the per-workgroup map first.
 - [ ] **WorkGroup always sent to Athena**: If `resolved_wg` is set, it must appear in the `StartQueryExecution` call. Dropping it causes queries to fall back to `primary` and run with the wrong IAM/billing scope.
 - [ ] **Config write access**: Can an authenticated user modify `workgroups.assignments` via the API to reroute another user's queries? The config write endpoint should be admin-only or at minimum scoped to the current user's databases.

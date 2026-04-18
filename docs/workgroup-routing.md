@@ -22,10 +22,8 @@ should read this before making changes.
 
 Database-to-workgroup mappings are assigned **manually through the UI** and
 persisted in the `workgroups.assignments` map in `argus.yaml` / the config
-store. The earlier naming-schema-based auto-resolution (`NamingSchema`,
-`{client_id}` patterns) is **deprecated** — the code still exists for
-backwards compatibility but the UI no longer drives it. Do not rely on
-pattern parsing for new features.
+store. Assignments are always explicit — there is no automatic pattern-based
+inference from database names.
 
 Summary:
 - User picks a database in the UI → assigns a workgroup to it
@@ -52,10 +50,6 @@ workgroups:
 
 defaults:
   output_location: s3://argus-results/default/   # app-wide fallback
-
-# NamingSchema below is legacy; left for compat but not wired to the UI.
-naming_schemas: {}
-active_schema: default
 ```
 
 Key env vars override config:
@@ -74,8 +68,7 @@ Two steps, both in `src/argus/services/athena_service.py`:
 resolved_wg = workgroup or self._resolve_workgroup(database, schema_name)
 ```
 
-`_resolve_workgroup` → `NamingResolver.resolve_workgroup(db)` →
-`workgroups.assignments.get(db)`.
+`_resolve_workgroup` → `workgroups.assignments.get(database)`.
 
 - **Explicit assignment only.** A DB without an `assignments` entry
   returns `None`. This is deliberate: Argus will not silently route a
@@ -153,7 +146,7 @@ repo (per-client infra).
 |---|---|
 | Pydantic shape of config | `src/argus/models/schemas.py` |
 | Loading YAML + env vars | `src/argus/core/config.py` |
-| Assignment lookup (legacy pattern code lives here too) | `src/argus/core/naming.py` |
+| Assignment lookup | `src/argus/services/athena_service.py::_resolve_workgroup` |
 | Per-query resolution | `src/argus/services/athena_service.py::start_query_execution` |
 | Workgroup CRUD (admin) | `src/argus/services/workgroup_service.py` |
 | Env var surface | Lambda env via `infra/lambda.tf` |
@@ -177,7 +170,7 @@ repo (per-client infra).
 
 - `tests/test_athena_service.py` — covers `_resolve_workgroup`,
   `_resolve_output`, and `start_query_execution` params.
-- `tests/test_config_loader.py` — covers env-var overrides.
+- `tests/test_api_queries.py` — covers the workgroup fallback in the query router.
 
 Always add a test case for any new fallback path. Silent fallbacks are the
 exact bug class this module exists to prevent.

@@ -46,7 +46,7 @@ Work through these areas in order. Mark each finding with its severity before mo
 - [ ] **Duplication**: Are service methods duplicated across routers? All AWS API calls should go through the service layer (`services/`), not be inlined in routers.
 - [ ] **Type safety**: All FastAPI request/response models must use Pydantic (`models/` or `api/schemas.py`). Raw dicts or `Any` types in route handlers are a red flag.
 - [ ] **Frontend types**: No `any` in TypeScript without a comment explaining why. Check `api/client.ts` — all API response types must be typed.
-- [ ] **Dead code**: Check for unused imports, unused Pydantic fields, and unreachable branches (especially in `naming.py` — the old naming-schema auto-resolution is deprecated).
+- [ ] **Dead code**: Check for unused imports, unused Pydantic fields, and unreachable branches.
 - [ ] **Consistent error handling**: Frontend API calls should go through the typed client in `api/client.ts` and handle errors uniformly. Watch for uncaught promise rejections.
 - [ ] **React anti-patterns**: No business logic in render functions. Expensive computations (e.g. `colDefs`, `rowData`) should be memoized if they depend on data that changes frequently. Check `ResultsGrid.tsx`.
 - [ ] **Zustand store hygiene**: Transient query state (`isLoading`, `queryError`, `queryExecutions`) must be stripped from persisted state — verify the `partialize` function in `editorStore.ts` is correct.
