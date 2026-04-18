@@ -178,7 +178,7 @@ export function SqlEditorPanel({ tabId }: Props) {
     }
   }, [tabId, activeTabId, tab?.database])
 
-  const handleEditorMount: OnMount = (editor, monacoNs) => {
+  const handleEditorMount: OnMount = (editor) => {
     editorRef.current = editor
     if (monaco && sqlDiagnostics) registerSqlDiagnostics(monaco, editor)
 
@@ -187,21 +187,28 @@ export function SqlEditorPanel({ tabId }: Props) {
       ;(window as unknown as Record<string, unknown>).__argus_editor = editor
     }
 
-    // Belt-and-suspenders: explicitly bind Space (with no modifiers) to
-    // 'type a space' inside the editor, overriding any keybinding context
-    // (suggestWidgetVisible, inlineSuggestionVisible, hasSnippet, etc.) that
-    // could otherwise consume the keystroke. The options-level
-    // acceptSuggestionOnCommitCharacter:false should already be enough, but
-    // multiple Monaco "accept" actions are bound to Space in some contexts
-    // (snippet jumps, inline suggestion accept, parameter hint cycle), and
-    // the safe way to disable them all is a single explicit bind here.
-    const ns = monacoNs ?? monaco
-    if (ns) {
-      // KeyCode.Space = 10
-      editor.addCommand(ns.KeyCode.Space, () => {
-        editor.trigger('keyboard', 'type', { text: ' ' })
-      })
-    }
+    // Highest-priority Space override: intercept at the keydown event level,
+    // BEFORE Monaco's command/keybinding service routes the event to whatever
+    // action might consume it (acceptSelectedSuggestion, snippet jump, inline
+    // suggestion accept, parameter hint cycle, etc.). This is the only way to
+    // be absolutely certain that an unmodified Space always inserts a literal
+    // space character into the editor — addCommand registers at the LOWEST
+    // priority and is overridden by context-bound actions like
+    // suggestWidgetVisible → acceptSelectedSuggestion.
+    editor.onKeyDown((e) => {
+      const isPlainSpace =
+        e.code === 'Space' &&
+        !e.altKey &&
+        !e.ctrlKey &&
+        !e.metaKey &&
+        !e.shiftKey
+      if (!isPlainSpace) return
+      e.preventDefault()
+      e.stopPropagation()
+      // Close the suggest widget so it doesn't reappear on the same character
+      editor.trigger('keyboard', 'hideSuggestWidget', {})
+      editor.trigger('keyboard', 'type', { text: ' ' })
+    })
   }
 
   // Enable/disable diagnostics when setting changes

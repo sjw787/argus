@@ -105,6 +105,41 @@ test('space inserts literal space after a complete SQL keyword (SELECT)', async 
   await expect(suggest).not.toBeVisible({ timeout: 1_500 })
 })
 
+test('REAL USER FLOW: typing SEL then space then FROM gives "SEL FROM"', async ({ page }) => {
+  // This test mirrors what an actual user does — types each character via the
+  // keyboard. Programmatic setValue() bypasses the autocomplete trigger path,
+  // so this is the only way to exercise the real bug.
+  await setEditorContent(page, '')
+  const tb = editorTextbox(page)
+  await tb.click({ force: true })
+
+  await page.keyboard.type('SEL')
+
+  // Suggest widget should pop up naturally because the user typed letters
+  const suggest = page.locator('.suggest-widget')
+  await expect(suggest).toBeVisible({ timeout: 8_000 })
+
+  // The critical keystroke: Space must insert a literal space, NOT accept the suggestion
+  await page.keyboard.press('Space')
+  await page.keyboard.type('FROM')
+
+  const value = await getEditorValue(page)
+  expect(value).toBe('SEL FROM')
+})
+
+test('REAL USER FLOW: typing SELECT then space gives "SELECT "', async ({ page }) => {
+  await setEditorContent(page, '')
+  const tb = editorTextbox(page)
+  await tb.click({ force: true })
+
+  await page.keyboard.type('SELECT')
+  // Don't wait for / require suggest widget — just press space immediately
+  await page.keyboard.press('Space')
+
+  const value = await getEditorValue(page)
+  expect(value).toBe('SELECT ')
+})
+
 test('space inserts literal space mid-token (SEL → SEL FROM)', async ({ page }) => {
   // Original regression: "SEL " produced "SELECT" or "SEL<keyword>" instead of "SEL ".
   await setEditorContent(page, 'SEL')
