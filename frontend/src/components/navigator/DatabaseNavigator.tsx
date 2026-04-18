@@ -755,10 +755,20 @@ function InformationSchemaNode({ onOpenTab, onInsert }: {
             {
               label: 'Insert table name at cursor',
               icon: <MousePointerClick size={13} />,
+              onClick: () => onInsert(`"${menu.tableName}"`),
+            },
+            {
+              label: 'Insert full name at cursor',
+              icon: <MousePointerClick size={13} />,
               onClick: () => onInsert(`information_schema.${menu.tableName}`),
             },
             {
               label: 'Copy table name',
+              icon: <ClipboardCopy size={13} />,
+              onClick: () => navigator.clipboard.writeText(menu.tableName),
+            },
+            {
+              label: 'Copy full name',
               icon: <ClipboardCopy size={13} />,
               onClick: () => navigator.clipboard.writeText(`information_schema.${menu.tableName}`),
             },
