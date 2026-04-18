@@ -3,8 +3,9 @@ import { useQuery } from '@tanstack/react-query'
 import { AgGridReact } from 'ag-grid-react'
 import type { ColDef, GridApi, CellContextMenuEvent } from 'ag-grid-community'
 import { api } from '../../api/client'
-import { Download, Ban, Filter } from 'lucide-react'
+import { Download, Ban, Filter, ListFilter } from 'lucide-react'
 import { useThemeStore } from '../../stores/themeStore'
+import { useEditorStore } from '../../stores/editorStore'
 
 interface Props {
   queryExecutionId: string
@@ -13,6 +14,7 @@ interface Props {
   limitApplied?: boolean
   autoLimit?: number
   onCancel?: () => void
+  tabId?: string
 }
 
 interface CellMenu {
@@ -22,7 +24,44 @@ interface CellMenu {
   value: string | null
 }
 
-export function ResultsGrid({ queryExecutionId, queryState, queryError, limitApplied, autoLimit, onCancel }: Props) {
+/** Append or inject a WHERE predicate into a SQL string. */
+function addWhereCondition(sql: string, col: string, value: string | null): string {
+  // Build the predicate
+  let predicate: string
+  if (value === null) {
+    predicate = `"${col}" IS NULL`
+  } else if (/^-?\d+(\.\d+)?$/.test(value)) {
+    predicate = `"${col}" = ${value}`
+  } else {
+    predicate = `"${col}" = '${value.replace(/'/g, "''")}'`
+  }
+
+  // Strip trailing semicolons/whitespace to manipulate cleanly
+  const trimmed = sql.trimEnd().replace(/;+$/, '').trimEnd()
+
+  // Case-insensitive check for existing WHERE
+  const whereRe = /\bWHERE\b/i
+  if (whereRe.test(trimmed)) {
+    // Append AND before ORDER BY / GROUP BY / HAVING / LIMIT if present,
+    // otherwise at end
+    const clauseRe = /\b(ORDER\s+BY|GROUP\s+BY|HAVING|LIMIT)\b/i
+    const match = clauseRe.exec(trimmed)
+    if (match) {
+      return trimmed.slice(0, match.index) + `AND ${predicate}\n` + trimmed.slice(match.index) + ';'
+    }
+    return trimmed + `\nAND ${predicate};`
+  }
+
+  // No WHERE — insert before ORDER BY / GROUP BY / HAVING / LIMIT, or at end
+  const clauseRe = /\b(ORDER\s+BY|GROUP\s+BY|HAVING|LIMIT)\b/i
+  const match = clauseRe.exec(trimmed)
+  if (match) {
+    return trimmed.slice(0, match.index) + `WHERE ${predicate}\n` + trimmed.slice(match.index) + ';'
+  }
+  return trimmed + `\nWHERE ${predicate};`
+}
+
+export function ResultsGrid({ queryExecutionId, queryState, queryError, limitApplied, autoLimit, onCancel, tabId }: Props) {
   const [isExporting, setIsExporting] = useState(false)
   const [cellMenu, setCellMenu] = useState<CellMenu | null>(null)
   const gridApiRef = useRef<GridApi | null>(null)
@@ -57,6 +96,15 @@ export function ResultsGrid({ queryExecutionId, queryState, queryError, limitApp
     }).then(() => gridApiRef.current!.onFilterChanged())
     setCellMenu(null)
   }, [cellMenu])
+
+  const addToWhere = useCallback(() => {
+    if (!cellMenu || !tabId) return
+    const tab = useEditorStore.getState().tabs.find(t => t.id === tabId)
+    if (!tab) return
+    const newSql = addWhereCondition(tab.sql, cellMenu.colId, cellMenu.value)
+    useEditorStore.getState().updateTab(tabId, { sql: newSql })
+    setCellMenu(null)
+  }, [cellMenu, tabId])
 
   const { data: results, isFetching } = useQuery({
     queryKey: ['queryResults', queryExecutionId],
@@ -218,7 +266,7 @@ export function ResultsGrid({ queryExecutionId, queryState, queryError, limitApp
             onClick={applyFilter}
             className="flex items-center gap-2 w-full px-3 py-2 text-xs text-left"
             style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-primary)' }}
-            onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent)')}
+            onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
             onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
           >
             <Filter size={12} style={{ color: 'var(--accent)', flexShrink: 0 }} />
@@ -228,6 +276,29 @@ export function ResultsGrid({ queryExecutionId, queryState, queryError, limitApp
               </strong>
             </span>
           </button>
+          {tabId && (
+            <>
+              <div style={{ height: 1, background: 'var(--border)', margin: '3px 0' }} />
+              <button
+                onClick={addToWhere}
+                className="flex items-center gap-2 w-full px-3 py-2 text-xs text-left"
+                style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--text-primary)' }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+              >
+                <ListFilter size={12} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+                <span>
+                  Add to WHERE: <strong style={{ fontFamily: 'monospace' }}>
+                    {cellMenu.value === null
+                      ? `"${cellMenu.colId}" IS NULL`
+                      : /^-?\d+(\.\d+)?$/.test(cellMenu.value)
+                        ? `"${cellMenu.colId}" = ${cellMenu.value}`
+                        : `"${cellMenu.colId}" = '${cellMenu.value.length > 20 ? cellMenu.value.slice(0, 20) + '…' : cellMenu.value}'`}
+                  </strong>
+                </span>
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>

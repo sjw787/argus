@@ -552,6 +552,7 @@ export function SqlEditorPanel({ tabId }: Props) {
                     queryState={exec.state}
                     limitApplied={exec.limitApplied}
                     autoLimit={autoLimit}
+                    tabId={tabId}
                     onCancel={(exec.state === 'RUNNING' || exec.state === 'QUEUED') ? () => handleCancel(exec.id) : undefined}
                   />
                 }
@@ -569,6 +570,7 @@ export function SqlEditorPanel({ tabId }: Props) {
               queryError={tab.queryError}
               limitApplied={tab.limitApplied}
               autoLimit={autoLimit}
+              tabId={tabId}
               onCancel={(tab.queryState === 'RUNNING' || tab.queryState === 'QUEUED') && tab.queryExecutionId ? () => handleCancel(tab.queryExecutionId!) : undefined}
             />
           ) : tab.queryError ? (
