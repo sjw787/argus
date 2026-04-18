@@ -10,6 +10,7 @@ from argus.api.schemas import (
     QueryStatus, QueryStats, QueryResults, ResultColumn, QueryListItem,
     NamedQueryCreate, NamedQueryItem, PreparedStatementCreate,
     PreparedStatementUpdate, PreparedStatementItem, QueryStatusSnapshot,
+    ExplainQueryRequest, ExplainPlanType,
 )
 from argus.api.dependencies import get_athena_service, get_config
 from argus.api.sse import query_status_stream
@@ -171,6 +172,37 @@ def execute_query(
             schema_name=body.schema_name,
         )
         return ExecuteQueryResponse(query_execution_id=resp["QueryExecutionId"], limit_applied=limit_applied)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/explain", response_model=ExecuteQueryResponse)
+def explain_query(
+    body: ExplainQueryRequest,
+    svc: Annotated[AthenaService, Depends(get_athena_service)],
+    config: Annotated[AppConfig, Depends(get_config)],
+):
+    """Submit an EXPLAIN (or EXPLAIN ANALYZE) for the given SQL and return a
+    query_execution_id that can be polled and fetched like a normal query.
+    The result rows contain the plan text in a single 'Query Plan' column."""
+    if body.database and config.workgroups.assignments and body.database not in config.workgroups.assignments:
+        body = body.model_copy(update={"workgroup": "primary"})
+
+    stripped = body.sql.strip().rstrip(";")
+    if body.plan_type == ExplainPlanType.ANALYZE:
+        explain_sql = f"EXPLAIN ANALYZE\n{stripped}"
+    else:
+        explain_sql = f"EXPLAIN (TYPE {body.plan_type.value})\n{stripped}"
+
+    try:
+        resp = svc.start_query_execution(
+            query=explain_sql,
+            database=body.database,
+            workgroup=body.workgroup,
+            output_location=body.output_location,
+            schema_name=body.schema_name,
+        )
+        return ExecuteQueryResponse(query_execution_id=resp["QueryExecutionId"], limit_applied=False)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 

@@ -452,3 +452,107 @@ class TestApplyAutoLimit:
         result, applied = _apply_auto_limit(sql, 500)
         assert applied is True
         assert result.endswith("LIMIT 500")
+
+
+# ---------------------------------------------------------------------------
+# /explain endpoint
+# ---------------------------------------------------------------------------
+
+class TestExplainQuery:
+    def test_explain_logical_returns_execution_id(self, client, mock_athena_svc):
+        """EXPLAIN LOGICAL submits a query and returns query_execution_id."""
+        mock_athena_svc.start_query_execution.return_value = {"QueryExecutionId": "explain-1"}
+        resp = client.post(
+            "/api/v1/queries/explain",
+            json={"sql": "SELECT * FROM t", "database": "mydb", "plan_type": "LOGICAL"},
+        )
+        assert resp.status_code == 200
+        assert resp.json()["query_execution_id"] == "explain-1"
+        assert resp.json()["limit_applied"] is False
+
+    def test_explain_prepends_logical_type(self, client, mock_athena_svc):
+        """Submitted SQL must be prefixed with EXPLAIN (TYPE LOGICAL)."""
+        mock_athena_svc.start_query_execution.return_value = {"QueryExecutionId": "e1"}
+        client.post(
+            "/api/v1/queries/explain",
+            json={"sql": "SELECT * FROM t", "database": "mydb", "plan_type": "LOGICAL"},
+        )
+        submitted = mock_athena_svc.start_query_execution.call_args.kwargs["query"]
+        assert submitted.startswith("EXPLAIN (TYPE LOGICAL)")
+        assert "SELECT * FROM t" in submitted
+
+    def test_explain_prepends_distributed_type(self, client, mock_athena_svc):
+        mock_athena_svc.start_query_execution.return_value = {"QueryExecutionId": "e2"}
+        client.post(
+            "/api/v1/queries/explain",
+            json={"sql": "SELECT 1", "database": "mydb", "plan_type": "DISTRIBUTED"},
+        )
+        submitted = mock_athena_svc.start_query_execution.call_args.kwargs["query"]
+        assert submitted.startswith("EXPLAIN (TYPE DISTRIBUTED)")
+
+    def test_explain_prepends_io_type(self, client, mock_athena_svc):
+        mock_athena_svc.start_query_execution.return_value = {"QueryExecutionId": "e3"}
+        client.post(
+            "/api/v1/queries/explain",
+            json={"sql": "SELECT 1", "database": "mydb", "plan_type": "IO"},
+        )
+        submitted = mock_athena_svc.start_query_execution.call_args.kwargs["query"]
+        assert submitted.startswith("EXPLAIN (TYPE IO)")
+
+    def test_explain_analyze_uses_analyze_syntax(self, client, mock_athena_svc):
+        """ANALYZE type must use 'EXPLAIN ANALYZE', not 'EXPLAIN (TYPE ANALYZE)'."""
+        mock_athena_svc.start_query_execution.return_value = {"QueryExecutionId": "e4"}
+        client.post(
+            "/api/v1/queries/explain",
+            json={"sql": "SELECT 1", "database": "mydb", "plan_type": "ANALYZE"},
+        )
+        submitted = mock_athena_svc.start_query_execution.call_args.kwargs["query"]
+        assert submitted.startswith("EXPLAIN ANALYZE")
+        assert "(TYPE ANALYZE)" not in submitted
+
+    def test_explain_strips_trailing_semicolons(self, client, mock_athena_svc):
+        """Trailing semicolons on the user's SQL must be stripped before prepending EXPLAIN."""
+        mock_athena_svc.start_query_execution.return_value = {"QueryExecutionId": "e5"}
+        client.post(
+            "/api/v1/queries/explain",
+            json={"sql": "SELECT 1;", "database": "mydb", "plan_type": "LOGICAL"},
+        )
+        submitted = mock_athena_svc.start_query_execution.call_args.kwargs["query"]
+        # The semicolon from user input must not appear between EXPLAIN header and the query
+        assert "EXPLAIN (TYPE LOGICAL)\nSELECT 1" in submitted
+        assert ";;" not in submitted
+
+    def test_explain_defaults_to_logical(self, client, mock_athena_svc):
+        """plan_type defaults to LOGICAL when omitted."""
+        mock_athena_svc.start_query_execution.return_value = {"QueryExecutionId": "e6"}
+        client.post(
+            "/api/v1/queries/explain",
+            json={"sql": "SELECT 1", "database": "mydb"},
+        )
+        submitted = mock_athena_svc.start_query_execution.call_args.kwargs["query"]
+        assert submitted.startswith("EXPLAIN (TYPE LOGICAL)")
+
+    def test_explain_returns_400_on_athena_error(self, client, mock_athena_svc):
+        mock_athena_svc.start_query_execution.side_effect = Exception("Athena error")
+        resp = client.post(
+            "/api/v1/queries/explain",
+            json={"sql": "SELECT 1", "database": "mydb", "plan_type": "LOGICAL"},
+        )
+        assert resp.status_code == 400
+
+    def test_explain_unassigned_db_falls_back_to_primary(self, mock_athena_svc):
+        """Unassigned database falls back to 'primary' workgroup (same as execute)."""
+        config = _config_with_assignments({"other_db": "other-wg"})
+        app = create_app()
+        app.dependency_overrides[get_config] = lambda: config
+        app.dependency_overrides[get_athena_service] = lambda: mock_athena_svc
+        mock_athena_svc.start_query_execution.return_value = {"QueryExecutionId": "e7"}
+
+        with TestClient(app) as c:
+            c.post(
+                "/api/v1/queries/explain",
+                json={"sql": "SELECT 1", "database": "unassigned_db", "plan_type": "LOGICAL"},
+            )
+
+        call_kwargs = mock_athena_svc.start_query_execution.call_args
+        assert call_kwargs.kwargs["workgroup"] == "primary"

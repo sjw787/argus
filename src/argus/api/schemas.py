@@ -1,4 +1,5 @@
 from __future__ import annotations
+from enum import Enum
 from typing import Optional, Any
 from pydantic import BaseModel, Field
 
@@ -17,6 +18,22 @@ class ExecuteQueryRequest(BaseModel):
 class ExecuteQueryResponse(BaseModel):
     query_execution_id: str
     limit_applied: bool = False
+
+
+class ExplainPlanType(str, Enum):
+    LOGICAL = "LOGICAL"
+    DISTRIBUTED = "DISTRIBUTED"
+    IO = "IO"
+    ANALYZE = "ANALYZE"
+
+
+class ExplainQueryRequest(BaseModel):
+    sql: str
+    database: str
+    workgroup: Optional[str] = None
+    output_location: Optional[str] = None
+    schema_name: Optional[str] = None
+    plan_type: ExplainPlanType = ExplainPlanType.LOGICAL
 
 
 class QueryStatus(BaseModel):

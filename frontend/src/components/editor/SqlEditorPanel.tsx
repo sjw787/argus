@@ -5,6 +5,7 @@ import type * as Monaco from 'monaco-editor'
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import { format as formatSql } from 'sql-formatter'
 import { api } from '../../api/client'
+import type { ExplainPlanType } from '../../api/client'
 import { useEditorStore } from '../../stores/editorStore'
 import { useThemeStore } from '../../stores/themeStore'
 import { useQueryNamesStore, extractSqlComment } from '../../stores/queryNamesStore'
@@ -12,7 +13,7 @@ import { registerSqlCompletion, unregisterSqlCompletion, setActiveDatabase } fro
 import { registerSqlDiagnostics, unregisterSqlDiagnostics } from '../../lib/sqlDiagnostics'
 import { ResultsGrid } from '../results/ResultsGrid'
 import { splitSqlStatements } from '../../utils/sql'
-import { Play, ChevronDown, Search, WandSparkles, Loader } from 'lucide-react'
+import { Play, ChevronDown, Search, WandSparkles, Loader, FileSearch } from 'lucide-react'
 
 
 const PAGE_LIMIT = 50
@@ -145,6 +146,21 @@ export function SqlEditorPanel({ tabId }: Props) {
   const queryClient = useQueryClient()
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null)
   const monaco = useMonaco()
+
+  const [explainPlanType, setExplainPlanType] = useState<ExplainPlanType>('LOGICAL')
+  const [explainDropdownOpen, setExplainDropdownOpen] = useState(false)
+  const [isExplaining, setIsExplaining] = useState(false)
+  const explainDropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!explainDropdownOpen) return
+    const close = (e: MouseEvent) => {
+      if (explainDropdownRef.current && !explainDropdownRef.current.contains(e.target as Node))
+        setExplainDropdownOpen(false)
+    }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [explainDropdownOpen])
 
   // Register/unregister completion provider based on setting
   useEffect(() => {
@@ -353,6 +369,42 @@ export function SqlEditorPanel({ tabId }: Props) {
     }
   }, [tab?.sql, tabId, updateTab, formatStyle])
 
+  const handleExplain = useCallback(async (planType: ExplainPlanType) => {
+    if (!tab?.database || !tab.sql.trim()) return
+    setExplainPlanType(planType)
+    setExplainDropdownOpen(false)
+    setIsExplaining(true)
+    try {
+      const data = await api.explainQuery({ sql: tab.sql, database: tab.database, plan_type: planType })
+      const poll = async () => {
+        const detail = await api.getQuery(data.query_execution_id)
+        const state = detail.status.state
+        if (state === 'RUNNING' || state === 'QUEUED') {
+          setTimeout(poll, 1500)
+          return
+        }
+        setIsExplaining(false)
+        if (state === 'SUCCEEDED') {
+          try {
+            const results = await api.getQueryResults(data.query_execution_id, 5000)
+            // Plan text is in the first column of each row; join into a single block
+            const planText = results.rows.map(r => r[0] ?? '').join('\n')
+            useEditorStore.getState().openTab({
+              title: `Plan (${planType}): ${tab.database}`,
+              sql: planText,
+              database: tab.database,
+            })
+          } catch {
+            // Failed to fetch results — silently ignore
+          }
+        }
+      }
+      poll()
+    } catch {
+      setIsExplaining(false)
+    }
+  }, [tab?.database, tab?.sql])
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.ctrlKey && e.key === 'Enter') handleRun()
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') { e.preventDefault(); handleFormat() }
@@ -409,6 +461,73 @@ export function SqlEditorPanel({ tabId }: Props) {
           <WandSparkles size={11} />
           Format
         </button>
+
+        {/* Explain button with plan type dropdown */}
+        <div ref={explainDropdownRef} style={{ position: 'relative' }}>
+          <div className="flex" style={{ border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden' }}>
+            <button
+              onClick={() => handleExplain(explainPlanType)}
+              disabled={!tab.database || !tab.sql.trim() || isExplaining}
+              className="flex items-center gap-1.5 px-2.5 py-1 text-xs"
+              style={{
+                background: 'var(--bg-panel)',
+                color: 'var(--text-muted)',
+                border: 'none',
+                cursor: (!tab.database || !tab.sql.trim() || isExplaining) ? 'not-allowed' : 'pointer',
+                opacity: (!tab.database || !tab.sql.trim() || isExplaining) ? 0.4 : 1,
+              }}
+              title={`Explain query (${explainPlanType})`}
+            >
+              {isExplaining ? <Loader size={11} className="animate-spin" /> : <FileSearch size={11} />}
+              Explain
+            </button>
+            <button
+              onClick={() => setExplainDropdownOpen(o => !o)}
+              disabled={!tab.database || !tab.sql.trim() || isExplaining}
+              className="flex items-center px-1 py-1 text-xs"
+              style={{
+                background: 'var(--bg-panel)',
+                color: 'var(--text-muted)',
+                borderLeft: '1px solid var(--border)',
+                cursor: (!tab.database || !tab.sql.trim() || isExplaining) ? 'not-allowed' : 'pointer',
+                opacity: (!tab.database || !tab.sql.trim() || isExplaining) ? 0.4 : 1,
+              }}
+              title="Select explain type"
+            >
+              <ChevronDown size={10} />
+            </button>
+          </div>
+          {explainDropdownOpen && (
+            <div
+              className="absolute z-50 rounded shadow-lg"
+              style={{ top: '100%', left: 0, marginTop: 2, background: 'var(--bg-panel)', border: '1px solid var(--border)', minWidth: 160 }}
+            >
+              {(['LOGICAL', 'DISTRIBUTED', 'IO', 'ANALYZE'] as const).map(type => (
+                <button
+                  key={type}
+                  onClick={() => handleExplain(type)}
+                  className="flex flex-col w-full px-3 py-2 text-left"
+                  style={{
+                    background: explainPlanType === type ? 'var(--bg-hover)' : 'transparent',
+                    border: 'none',
+                    cursor: 'pointer',
+                    color: 'var(--text-primary)',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = explainPlanType === type ? 'var(--bg-hover)' : 'transparent')}
+                >
+                  <span className="text-xs font-medium">{type}</span>
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                    {type === 'LOGICAL' && 'Logical query plan tree'}
+                    {type === 'DISTRIBUTED' && 'Distributed execution plan'}
+                    {type === 'IO' && 'I/O cost and statistics'}
+                    {type === 'ANALYZE' && 'Actual runtime stats (runs query)'}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* State badge — aggregate for multi-query */}
         {tab.queryExecutions ? (() => {

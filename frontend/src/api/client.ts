@@ -240,11 +240,25 @@ export interface SsoSelectRoleResponse {
   credential_id?: string  // Lambda mode: send as X-Credential-Id header
 }
 
+export type ExplainPlanType = 'LOGICAL' | 'DISTRIBUTED' | 'IO' | 'ANALYZE'
+
+export interface ExplainQueryRequest {
+  sql: string
+  database: string
+  workgroup?: string
+  output_location?: string
+  schema_name?: string
+  plan_type?: ExplainPlanType
+}
+
 // API functions
 export const api = {
   // Queries
   executeQuery: (data: ExecuteQueryRequest) =>
     apiClient.post<ExecuteQueryResponse>('/queries/execute', data).then(r => r.data),
+
+  explainQuery: (data: ExplainQueryRequest) =>
+    apiClient.post<ExecuteQueryResponse>('/queries/explain', data).then(r => r.data),
 
   getQuery: (id: string) =>
     apiClient.get<QueryExecutionDetail>(`/queries/${id}`).then(r => r.data),

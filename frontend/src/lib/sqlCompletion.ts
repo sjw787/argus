@@ -104,13 +104,60 @@ export function setActiveDatabase(database: string) {
   _activeDatabase = database
 }
 
+/** Return true if the cursor position is inside a SQL line or block comment. */
+function isInComment(model: Monaco.editor.ITextModel, position: Monaco.Position): boolean {
+  const lineUpToCursor = model.getValueInRange({
+    startLineNumber: position.lineNumber, startColumn: 1,
+    endLineNumber: position.lineNumber, endColumn: position.column,
+  })
+
+  // Line comment: find first `--` that isn't inside a string literal
+  let inString = false
+  for (let i = 0; i < lineUpToCursor.length - 1; i++) {
+    if (lineUpToCursor[i] === "'") { inString = !inString; continue }
+    if (!inString && lineUpToCursor[i] === '-' && lineUpToCursor[i + 1] === '-') return true
+  }
+
+  // Block comment: scan full text up to cursor for /* ... */
+  const fullTextToCursor = model.getValueInRange({
+    startLineNumber: 1, startColumn: 1,
+    endLineNumber: position.lineNumber, endColumn: position.column,
+  })
+  let depth = 0
+  let j = 0
+  while (j < fullTextToCursor.length) {
+    if (fullTextToCursor[j] === "'" && depth === 0) {
+      // Skip string literal
+      j++
+      while (j < fullTextToCursor.length) {
+        if (fullTextToCursor[j] === "'" && fullTextToCursor[j + 1] === "'") { j += 2; continue }
+        if (fullTextToCursor[j] === "'") { j++; break }
+        j++
+      }
+      continue
+    }
+    if (fullTextToCursor[j] === '/' && fullTextToCursor[j + 1] === '*') { depth++; j += 2; continue }
+    if (fullTextToCursor[j] === '*' && fullTextToCursor[j + 1] === '/') { depth = Math.max(0, depth - 1); j += 2; continue }
+    j++
+  }
+  return depth > 0
+}
+
 export function registerSqlCompletion(monaco: typeof Monaco) {
   if (_disposable) return  // already registered
 
   _disposable = monaco.languages.registerCompletionItemProvider('sql', {
-    triggerCharacters: [' ', '.', '\n'],
+    // Only trigger on `.` for table.column completions.
+    // Keywords/tables/columns are still suggested as the user types letters
+    // via Monaco's built-in word-based trigger — no need to intercept space,
+    // which causes the dropdown to open inside comments and string literals.
+    triggerCharacters: ['.'],
 
     async provideCompletionItems(model, position) {
+      // Don't suggest inside comments — this was causing spacebar to be
+      // intercepted when typing comment text.
+      if (isInComment(model, position)) return { suggestions: [] }
+
       const word = model.getWordUntilPosition(position)
       const range: Monaco.IRange = {
         startLineNumber: position.lineNumber,
