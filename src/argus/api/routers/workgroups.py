@@ -6,12 +6,11 @@ from pydantic import BaseModel
 from botocore.exceptions import ClientError
 
 from argus.api.schemas import (
-    WorkgroupItem, WorkgroupCreate, WorkgroupUpdate, WorkgroupResolveResult, TagItem,
+    WorkgroupItem, WorkgroupCreate, WorkgroupUpdate, TagItem,
 )
 from argus.api.dependencies import get_workgroup_service, get_config, get_s3
 from argus.services.workgroup_service import WorkgroupService
 from argus.models.schemas import AppConfig
-from argus.core.naming import get_resolver
 
 router = APIRouter(prefix="/workgroups", tags=["workgroups"])
 
@@ -129,44 +128,6 @@ def list_workgroups(
         return result
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.get("/resolve/{database_name}", response_model=WorkgroupResolveResult)
-def resolve_workgroup(
-    database_name: str,
-    config: Annotated[AppConfig, Depends(get_config)],
-    schema_name: Optional[str] = Query(default=None),
-):
-    # Explicit UI-managed assignment always wins.
-    assigned = config.workgroups.assignments.get(database_name)
-    if assigned:
-        output = (
-            config.workgroups.output_locations.get(assigned)
-            or config.defaults.output_location
-        )
-        return WorkgroupResolveResult(
-            database=database_name,
-            workgroup=assigned,
-            parsed_parts=None,
-            output_location=output,
-            matched=True,
-        )
-
-    resolver = get_resolver(config, schema_name)
-    if resolver is None:
-        return WorkgroupResolveResult(database=database_name, matched=False)
-    wg = resolver.resolve_workgroup(database_name)
-    parts = resolver.parse_database_name(database_name)
-    output = None
-    if wg:
-        output = config.workgroups.output_locations.get(wg) or config.defaults.output_location
-    return WorkgroupResolveResult(
-        database=database_name,
-        workgroup=wg,
-        parsed_parts=parts,
-        output_location=output,
-        matched=wg is not None,
-    )
 
 
 @router.get("/{name}", response_model=WorkgroupItem)

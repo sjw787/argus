@@ -29,7 +29,6 @@ export function Toolbar() {
             <>
               <span>Region: <strong style={{ color: 'var(--text-primary)' }}>{config.region}</strong></span>
               <span>Profile: <strong style={{ color: 'var(--text-primary)' }}>{config.profile ?? 'default'}</strong></span>
-              <span>Schema: <strong style={{ color: 'var(--accent)' }}>{config.active_schema}</strong></span>
             </>
           )}
           <a

@@ -4,7 +4,6 @@ from typing import Annotated, Optional
 import yaml
 import typer
 from rich.console import Console
-from rich.table import Table
 from rich.syntax import Syntax
 
 from argus.core.config import load_config, reset_config_cache
@@ -33,10 +32,8 @@ def config_validate(
     try:
         cfg = load_config(config)
         console.print("[green]✓ Configuration is valid[/green]")
-        console.print(f"  Active schema: {cfg.active_schema}")
         console.print(f"  Region: {cfg.aws.region}")
         console.print(f"  Profile: {cfg.aws.profile or '(default credential chain)'}")
-        console.print(f"  Naming schemas: {', '.join(cfg.naming_schemas.keys()) or '(none)'}")
     except Exception as e:
         console.print(f"[red]✗ Configuration invalid:[/red] {e}")
         raise typer.Exit(1)
@@ -55,15 +52,6 @@ def config_init(
             "region": "us-east-1",
             "profile": None,
         },
-        "naming_schemas": {
-            "default": {
-                "pattern": "{purpose}_{client_id}_{environment}",
-                "client_id_regex": "\\d{6}|\\d{9}",
-                "workgroup_pattern": "{purpose}_{client_id}_{environment}",
-                "description": "Standard schema: purpose_clientid_env",
-            }
-        },
-        "active_schema": "default",
         "workgroups": {
             "output_locations": {
                 "analytics_123456_prod": "s3://my-athena-results/123456/prod/",
@@ -81,30 +69,3 @@ def config_init(
         yaml.dump(example, f, default_flow_style=False)
 
     console.print(f"[green]Config written to:[/green] {output}")
-
-
-@config_app.command("schemas")
-def config_schemas(
-    config: Annotated[Optional[Path], typer.Option("--config", "-c")] = None,
-):
-    """List available naming schemas."""
-    reset_config_cache()
-    cfg = load_config(config)
-    if not cfg.naming_schemas:
-        console.print("[yellow]No naming schemas configured.[/yellow]")
-        return
-    table = Table(title="Naming Schemas")
-    table.add_column("Name", style="cyan")
-    table.add_column("Pattern")
-    table.add_column("Workgroup Pattern")
-    table.add_column("Client ID Regex")
-    table.add_column("Active")
-    for name, schema in cfg.naming_schemas.items():
-        table.add_row(
-            name,
-            schema.pattern,
-            schema.workgroup_pattern,
-            schema.client_id_regex,
-            "✓" if name == cfg.active_schema else "",
-        )
-    console.print(table)

@@ -1,7 +1,6 @@
 from __future__ import annotations
 from typing import Optional, Any
 from argus.models.schemas import AppConfig
-from argus.core.naming import get_resolver
 
 
 class CatalogService:
@@ -59,28 +58,6 @@ class CatalogService:
         if catalog_id:
             params["CatalogId"] = catalog_id
         return self._client.delete_database(**params)
-
-    def search_databases_by_client_id(
-        self,
-        client_id: str,
-        schema_name: Optional[str] = None,
-        catalog_id: Optional[str] = None,
-    ) -> list[dict]:
-        """Return all databases whose name contains the given client_id according to the active schema."""
-        resolver = get_resolver(self._config, schema_name)
-        all_dbs: list[dict] = []
-        next_token = None
-        while True:
-            resp = self.list_databases(catalog_id=catalog_id, next_token=next_token)
-            for db in resp.get("DatabaseList", []):
-                db_name = db["Name"]
-                extracted = resolver.get_client_id(db_name) if resolver else None
-                if extracted == client_id or client_id in db_name:
-                    all_dbs.append(db)
-            next_token = resp.get("NextToken")
-            if not next_token:
-                break
-        return all_dbs
 
     def list_tables(
         self,

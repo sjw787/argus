@@ -12,7 +12,6 @@ from argus.api.dependencies import get_catalog_service, get_config, get_athena_s
 from argus.services.catalog_service import CatalogService
 from argus.services.athena_service import AthenaService
 from argus.models.schemas import AppConfig
-from argus.core.naming import get_resolver
 
 router = APIRouter(prefix="/catalog", tags=["catalog"])
 
@@ -90,7 +89,6 @@ def list_databases(
         cache_key = (catalog_id, profile or config.aws.profile, region or config.aws.region)
         all_dbs = _db_cache.get(cache_key)
         if all_dbs is None:
-            resolver = get_resolver(config)
             assignments = config.workgroups.assignments
             all_dbs = []
             next_token = None
@@ -98,9 +96,7 @@ def list_databases(
                 resp = svc.list_databases(catalog_id=catalog_id, next_token=next_token)
                 for db in resp.get("DatabaseList", []):
                     db_name = db["Name"]
-                    wg = assignments.get(db_name) or (
-                        resolver.resolve_workgroup(db_name) if resolver else None
-                    )
+                    wg = assignments.get(db_name)
                     all_dbs.append(DatabaseItem(
                         name=db_name,
                         description=db.get("Description"),
@@ -215,7 +211,6 @@ def list_information_schema_tables(
                     location=None,
                     created_time=None,
                 ))
-        return tables
         return tables
     except HTTPException:
         raise
@@ -420,27 +415,5 @@ def get_er_diagram(
                             _add_edge(tname, col_lower, other, "id")
 
         return ErDiagramData(nodes=nodes, edges=edges)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.get("/search", response_model=list[DatabaseItem])
-def search_by_client_id(
-    svc: Annotated[CatalogService, Depends(get_catalog_service)],
-    client_id: str = Query(...),
-    schema_name: Optional[str] = Query(default=None),
-    catalog_id: Optional[str] = Query(default=None),
-):
-    try:
-        dbs = svc.search_databases_by_client_id(client_id, schema_name=schema_name, catalog_id=catalog_id)
-        return [
-            DatabaseItem(
-                name=db["Name"],
-                description=db.get("Description"),
-                location_uri=db.get("LocationUri"),
-                parameters=db.get("Parameters", {}),
-            )
-            for db in dbs
-        ]
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

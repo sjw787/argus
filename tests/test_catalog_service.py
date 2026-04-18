@@ -2,21 +2,12 @@ from __future__ import annotations
 import pytest
 from unittest.mock import MagicMock
 from argus.services.catalog_service import CatalogService
-from argus.models.schemas import AppConfig, NamingSchema
+from argus.models.schemas import AppConfig
 
 
 @pytest.fixture
 def config():
-    return AppConfig(
-        naming_schemas={
-            "default": NamingSchema(
-                pattern="{purpose}_{client_id}_{environment}",
-                client_id_regex=r"\d{6}|\d{9}",
-                workgroup_pattern="{purpose}_{client_id}_{environment}",
-            )
-        },
-        active_schema="default",
-    )
+    return AppConfig()
 
 
 @pytest.fixture
@@ -48,21 +39,6 @@ def test_create_database(service, mock_client):
     call_kwargs = mock_client.create_database.call_args[1]
     assert call_kwargs["DatabaseInput"]["Name"] == "newdb"
     assert call_kwargs["DatabaseInput"]["Description"] == "test db"
-
-
-def test_search_databases_by_client_id(service, mock_client):
-    mock_client.get_databases.return_value = {
-        "DatabaseList": [
-            {"Name": "analytics_123456_prod"},
-            {"Name": "analytics_999999_prod"},
-            {"Name": "reporting_123456_dev"},
-        ]
-    }
-    results = service.search_databases_by_client_id("123456")
-    names = [db["Name"] for db in results]
-    assert "analytics_123456_prod" in names
-    assert "reporting_123456_dev" in names
-    assert "analytics_999999_prod" not in names
 
 
 def test_list_databases_with_optional_params(service, mock_client):
@@ -106,28 +82,6 @@ def test_delete_database_with_catalog_id(service, mock_client):
     mock_client.delete_database.return_value = {}
     service.delete_database("olddb", catalog_id="cat1")
     mock_client.delete_database.assert_called_once_with(Name="olddb", CatalogId="cat1")
-
-
-def test_search_databases_by_client_id_pagination(service, mock_client):
-    mock_client.get_databases.side_effect = [
-        {"DatabaseList": [{"Name": "analytics_123456_prod"}], "NextToken": "t1"},
-        {"DatabaseList": [{"Name": "reporting_123456_dev"}]},
-    ]
-    results = service.search_databases_by_client_id("123456")
-    assert len(results) == 2
-    assert mock_client.get_databases.call_count == 2
-
-
-def test_search_databases_by_client_id_no_resolver(mock_client):
-    from argus.models.schemas import AppConfig
-    svc = CatalogService(mock_client, AppConfig())
-    mock_client.get_databases.return_value = {
-        "DatabaseList": [{"Name": "client123_data"}, {"Name": "other_db"}]
-    }
-    results = svc.search_databases_by_client_id("client123")
-    names = [d["Name"] for d in results]
-    assert "client123_data" in names
-    assert "other_db" not in names
 
 
 def test_list_tables(service, mock_client):

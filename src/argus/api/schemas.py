@@ -193,14 +193,6 @@ class WorkgroupUpdate(BaseModel):
     state: Optional[str] = None
 
 
-class WorkgroupResolveResult(BaseModel):
-    database: str
-    workgroup: Optional[str] = None
-    parsed_parts: Optional[dict[str, str]] = None
-    output_location: Optional[str] = None
-    matched: bool
-
-
 class TagItem(BaseModel):
     key: str
     value: str
@@ -208,20 +200,9 @@ class TagItem(BaseModel):
 
 # ── Config Models ─────────────────────────────────────────────────────────────
 
-class NamingSchemaInfo(BaseModel):
-    name: str
-    pattern: str
-    workgroup_pattern: str
-    client_id_regex: str
-    description: Optional[str] = None
-    is_active: bool
-
-
 class ConfigInfo(BaseModel):
     region: str
     profile: Optional[str] = None
-    active_schema: str
-    naming_schemas: list[NamingSchemaInfo]
     workgroup_output_locations: dict[str, str]
     default_output_location: Optional[str] = None
     max_results: int

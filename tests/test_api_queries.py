@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 from argus.api.app import create_app
 from argus.api.dependencies import get_athena_service, get_config
-from argus.models.schemas import AppConfig, NamingSchema, WorkgroupConfig
+from argus.models.schemas import AppConfig, WorkgroupConfig
 
 
 @pytest.fixture
@@ -22,18 +22,8 @@ def client(mock_athena_svc):
 
 
 def _config_with_assignments(assignments: dict) -> AppConfig:
-    """Return an AppConfig with a named schema and explicit workgroup assignments."""
-    return AppConfig(
-        naming_schemas={
-            "default": NamingSchema(
-                pattern="{client_id}_prod",
-                client_id_regex=r"[a-z0-9]+",
-                workgroup_pattern="{client_id}-wg",
-            )
-        },
-        active_schema="default",
-        workgroups=WorkgroupConfig(assignments=assignments),
-    )
+    """Return an AppConfig with explicit workgroup assignments."""
+    return AppConfig(workgroups=WorkgroupConfig(assignments=assignments))
 
 
 def test_execute_query(client, mock_athena_svc):
@@ -48,8 +38,8 @@ def test_execute_query(client, mock_athena_svc):
 # ---------------------------------------------------------------------------
 
 def test_execute_query_uses_primary_when_db_unassigned(mock_athena_svc):
-    """An unassigned database should fall back to the 'primary' workgroup."""
-    config = _config_with_assignments({})  # no assignments
+    """An unassigned database should fall back to the 'primary' workgroup when assignments are configured."""
+    config = _config_with_assignments({"other_db": "other-wg"})  # non-empty, but target db not in it
     app = create_app()
     app.dependency_overrides[get_config] = lambda: config
     app.dependency_overrides[get_athena_service] = lambda: mock_athena_svc

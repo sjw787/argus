@@ -189,33 +189,14 @@ export interface WorkgroupItem {
   created_time?: string
 }
 
-export interface WorkgroupResolveResult {
-  database: string
-  workgroup?: string
-  parsed_parts?: Record<string, string>
-  output_location?: string
-  matched: boolean
-}
-
 export interface ConfigInfo {
   region: string
   profile?: string
-  active_schema: string
-  naming_schemas: NamingSchemaInfo[]
   workgroup_output_locations: Record<string, string>
   default_output_location?: string
   max_results: number
   query_timeout_seconds: number
   locked_settings: string[]
-}
-
-export interface NamingSchemaInfo {
-  name: string
-  pattern: string
-  workgroup_pattern: string
-  client_id_regex: string
-  description?: string
-  is_active: boolean
 }
 
 // Auth / SSO types
@@ -316,15 +297,9 @@ export const api = {
   getErDiagram: (dbName: string) =>
     apiClient.get<ErDiagramData>(`/catalog/databases/${dbName}/er-diagram`).then(r => r.data),
 
-  searchByClientId: (clientId: string, schemaName?: string) =>
-    apiClient.get<DatabaseItem[]>('/catalog/search', { params: { client_id: clientId, schema_name: schemaName } }).then(r => r.data),
-
   // Workgroups
   listWorkgroups: () =>
     apiClient.get<WorkgroupItem[]>('/workgroups').then(r => r.data),
-
-  resolveWorkgroup: (database: string) =>
-    apiClient.get<WorkgroupResolveResult>(`/workgroups/resolve/${database}`).then(r => r.data),
 
   // Config
   getConfig: () =>

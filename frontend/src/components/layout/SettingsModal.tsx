@@ -320,7 +320,6 @@ export function SettingsModal({ onClose }: Props) {
                     {[
                       ['Region', config.region],
                       ['Profile', config.profile ?? 'default'],
-                      ['Active Schema', config.active_schema],
                       ['Config file', 'argus.yaml'],
                     ].map(([label, value], i, arr) => (
                       <div

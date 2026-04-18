@@ -15,7 +15,6 @@ from argus.api.dependencies import get_athena_service, get_config
 from argus.api.sse import query_status_stream
 from argus.services.athena_service import AthenaService
 from argus.models.schemas import AppConfig
-from argus.core.naming import get_resolver
 
 router = APIRouter(prefix="/queries", tags=["queries"])
 
@@ -155,10 +154,8 @@ def execute_query(
     config: Annotated[AppConfig, Depends(get_config)],
 ):
     # Unassigned databases fall back to the "primary" Athena workgroup
-    if body.database:
-        resolver = get_resolver(config)
-        if resolver is not None and resolver.resolve_workgroup(body.database) is None:
-            body = body.model_copy(update={"workgroup": "primary"})
+    if body.database and config.workgroups.assignments and body.database not in config.workgroups.assignments:
+        body = body.model_copy(update={"workgroup": "primary"})
 
     sql = body.sql
     limit_applied = False

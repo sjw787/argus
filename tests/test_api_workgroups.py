@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 from argus.api.app import create_app
 from argus.api.dependencies import get_workgroup_service, get_config
-from argus.models.schemas import AppConfig, NamingSchema, WorkgroupConfig
+from argus.models.schemas import AppConfig
 
 
 @pytest.fixture
@@ -89,34 +89,3 @@ def test_update_workgroup(client, mock_wg_svc):
     }
     resp = client.put("/api/v1/workgroups/primary", json={"description": "Updated"})
     assert resp.status_code == 200
-
-
-def test_resolve_workgroup_no_schema(client):
-    resp = client.get("/api/v1/workgroups/resolve/mydb")
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["database"] == "mydb"
-    assert data["matched"] is False
-
-
-def test_resolve_workgroup_with_schema():
-    config = AppConfig(
-        naming_schemas={
-            "default": NamingSchema(
-                pattern="{client_id}_prod",
-                client_id_regex=r"[a-z0-9]+",
-                workgroup_pattern="{client_id}-wg",
-            )
-        },
-        active_schema="default",
-        workgroups=WorkgroupConfig(assignments={"acme_prod": "acme-wg"}),
-    )
-    app = create_app()
-    app.dependency_overrides[get_config] = lambda: config
-    app.dependency_overrides[get_workgroup_service] = lambda: MagicMock()
-    with TestClient(app) as c:
-        resp = c.get("/api/v1/workgroups/resolve/acme_prod")
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["matched"] is True
-    assert data["workgroup"] == "acme-wg"

@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from argus.api.app import create_app
 from argus.api.dependencies import get_catalog_service, get_config
 from argus.api.routers.catalog import _db_cache
-from argus.models.schemas import AppConfig, NamingSchema, WorkgroupConfig
+from argus.models.schemas import AppConfig, WorkgroupConfig
 
 
 @pytest.fixture(autouse=True)
@@ -46,14 +46,6 @@ def test_list_databases(client, mock_catalog_svc):
 def test_list_databases_shows_assigned_workgroup(mock_catalog_svc):
     """Databases with an explicit assignment should have their workgroup returned."""
     config = AppConfig(
-        naming_schemas={
-            "default": NamingSchema(
-                pattern="{client_id}_prod",
-                client_id_regex=r"[a-z0-9]+",
-                workgroup_pattern="{client_id}-wg",
-            )
-        },
-        active_schema="default",
         workgroups=WorkgroupConfig(assignments={"acme_prod": "acme-wg"}),
     )
     app = create_app()
@@ -71,14 +63,6 @@ def test_list_databases_shows_assigned_workgroup(mock_catalog_svc):
 def test_list_databases_unassigned_workgroup_is_none(mock_catalog_svc):
     """Databases not in the assignment map should have workgroup=None."""
     config = AppConfig(
-        naming_schemas={
-            "default": NamingSchema(
-                pattern="{client_id}_prod",
-                client_id_regex=r"[a-z0-9]+",
-                workgroup_pattern="{client_id}-wg",
-            )
-        },
-        active_schema="default",
         workgroups=WorkgroupConfig(assignments={}),  # no assignments
     )
     app = create_app()
@@ -111,14 +95,6 @@ def test_list_databases_no_schema_workgroup_is_none(mock_catalog_svc):
 def test_list_databases_multiple_mixed_assignments(mock_catalog_svc):
     """Only assigned databases carry a workgroup; unassigned ones stay None."""
     config = AppConfig(
-        naming_schemas={
-            "default": NamingSchema(
-                pattern="{client_id}_prod",
-                client_id_regex=r"[a-z0-9]+",
-                workgroup_pattern="{client_id}-wg",
-            )
-        },
-        active_schema="default",
         workgroups=WorkgroupConfig(assignments={"assigned_prod": "assigned-wg"}),
     )
     app = create_app()
@@ -232,12 +208,3 @@ def test_er_diagram(client, mock_catalog_svc):
     assert len(data["nodes"]) == 2
     # user_id in orders should create edge to user
     assert any(e["source_column"] == "user_id" for e in data["edges"])
-
-
-def test_search_databases(client, mock_catalog_svc):
-    mock_catalog_svc.search_databases_by_client_id.return_value = [
-        {"Name": "client123_prod"}
-    ]
-    resp = client.get("/api/v1/catalog/search?client_id=client123")
-    assert resp.status_code == 200
-    assert resp.json()[0]["name"] == "client123_prod"

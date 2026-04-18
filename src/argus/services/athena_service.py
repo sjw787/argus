@@ -2,7 +2,6 @@ from __future__ import annotations
 import time
 from typing import Optional, Any
 from argus.models.schemas import AppConfig
-from argus.core.naming import get_resolver
 
 
 class AthenaService:
@@ -186,14 +185,7 @@ class AthenaService:
         )
 
     def _resolve_workgroup(self, database: str, schema_name: Optional[str]) -> Optional[str]:
-        # Explicit UI-managed assignment takes precedence over any naming schema.
-        assigned = self._config.workgroups.assignments.get(database)
-        if assigned:
-            return assigned
-        resolver = get_resolver(self._config, schema_name)
-        if resolver is None:
-            return None
-        return resolver.resolve_workgroup(database)
+        return self._config.workgroups.assignments.get(database)
 
     def _resolve_output(self, workgroup: Optional[str]) -> Optional[str]:
         if workgroup and workgroup in self._config.workgroups.output_locations:

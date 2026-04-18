@@ -2,20 +2,12 @@ from __future__ import annotations
 import pytest
 from unittest.mock import MagicMock
 from argus.services.athena_service import AthenaService
-from argus.models.schemas import AppConfig, NamingSchema, WorkgroupConfig, DefaultsConfig
+from argus.models.schemas import AppConfig, WorkgroupConfig, DefaultsConfig
 
 
 @pytest.fixture
 def config_with_schema():
     return AppConfig(
-        naming_schemas={
-            "default": NamingSchema(
-                pattern="{purpose}_{client_id}_{environment}",
-                client_id_regex=r"\d{6}|\d{9}",
-                workgroup_pattern="{purpose}_{client_id}_{environment}",
-            )
-        },
-        active_schema="default",
         workgroups=WorkgroupConfig(
             output_locations={
                 "analytics_123456_prod": "s3://results/123456/prod/",

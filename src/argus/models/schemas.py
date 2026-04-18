@@ -3,14 +3,6 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
-class NamingSchema(BaseModel):
-    """Defines how to parse database names and resolve workgroup names."""
-    pattern: str
-    client_id_regex: str
-    workgroup_pattern: str
-    description: Optional[str] = None
-
-
 class WorkgroupConfig(BaseModel):
     output_locations: dict[str, str] = Field(default_factory=dict)
     assignments: dict[str, str] = Field(default_factory=dict)
@@ -30,8 +22,6 @@ class DefaultsConfig(BaseModel):
 
 class AppConfig(BaseModel):
     aws: AWSConfig = Field(default_factory=AWSConfig)
-    naming_schemas: dict[str, NamingSchema] = Field(default_factory=dict)
-    active_schema: str = "default"
     workgroups: WorkgroupConfig = Field(default_factory=WorkgroupConfig)
     defaults: DefaultsConfig = Field(default_factory=DefaultsConfig)
     auth_mode: str = "sso"

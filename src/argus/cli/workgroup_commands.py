@@ -7,7 +7,6 @@ from rich.table import Table
 
 from argus.core.config import load_config, reset_config_cache
 from argus.core.auth import get_athena_client
-from argus.core.naming import get_resolver
 from argus.services.workgroup_service import WorkgroupService
 
 workgroup_app = typer.Typer(no_args_is_help=True)
@@ -143,29 +142,6 @@ def wg_delete(
     except Exception as e:
         console.print(f"[red]Error:[/red] {e}")
         raise typer.Exit(1)
-
-
-@workgroup_app.command("resolve")
-def wg_resolve(
-    database: Annotated[str, typer.Argument(help="Database name to resolve workgroup for")],
-    schema: Annotated[Optional[str], typer.Option("--schema", "-s")] = None,
-):
-    """Show which workgroup would be used for a given database name."""
-    cfg = _state["config"]
-    resolver = get_resolver(cfg, schema)
-    if resolver is None:
-        console.print("[yellow]No naming schema configured.[/yellow]")
-        raise typer.Exit(1)
-    wg = resolver.resolve_workgroup(database)
-    parts = resolver.parse_database_name(database)
-    if wg is None:
-        console.print(f"[red]Database name '{database}' does not match the active naming schema.[/red]")
-        raise typer.Exit(1)
-    console.print(f"[cyan]Database:[/cyan] {database}")
-    console.print(f"[cyan]Parsed parts:[/cyan] {parts}")
-    console.print(f"[green]Resolved workgroup:[/green] {wg}")
-    s3 = cfg.workgroups.output_locations.get(wg) or cfg.defaults.output_location
-    console.print(f"[cyan]S3 output:[/cyan] {s3 or '(workgroup default)'}")
 
 
 tags_app = typer.Typer(no_args_is_help=True)
