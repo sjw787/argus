@@ -1,0 +1,404 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Run weekly on Monday at 08:00 UTC
+    - cron: '0 8 * * 1'
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Bandit — Python-specific SAST
+  # ---------------------------------------------------------------------------
+  bandit:
+    name: Bandit (Python SAST)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install Bandit
+        run: pip install bandit
+
+      - name: Run Bandit
+        id: bandit
+        run: |
+          bandit -r src/argus \
+            -f json \
+            -o bandit-results.json \
+            -ll \
+            --exit-zero
+          # Capture finding count for the summary step
+          ISSUES=$(python -c "
+          import json, sys
+          with open('bandit-results.json') as f:
+              d = json.load(f)
+          results = d.get('results', [])
+          highs = [r for r in results if r['issue_severity'] == 'HIGH']
+          meds  = [r for r in results if r['issue_severity'] == 'MEDIUM']
+          print(f'{len(results)} total ({len(highs)} HIGH, {len(meds)} MEDIUM)')
+          sys.exit(1 if results else 0)
+          " 2>&1) || echo "BANDIT_FINDINGS=true" >> "$GITHUB_ENV"
+          echo "BANDIT_SUMMARY=$ISSUES" >> "$GITHUB_ENV"
+
+      - name: Upload Bandit results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-results
+          path: bandit-results.json
+          retention-days: 30
+
+      - name: Open / update GitHub Issue on findings
+        if: env.BANDIT_FINDINGS == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          LABEL="security/bandit"
+          # Create label if it doesn't exist
+          gh label create "$LABEL" --color "B60205" --description "Bandit SAST finding" 2>/dev/null || true
+
+          EXISTING=$(gh issue list --label "$LABEL" --state open --json number --jq '.[0].number' 2>/dev/null)
+
+          BODY="## Bandit Security Findings
+
+          **Run:** [\`${{ github.sha }}\`](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          **Branch:** \`${{ github.ref_name }}\`
+          **Summary:** ${{ env.BANDIT_SUMMARY }}
+
+          Download the full \`bandit-results.json\` artifact from the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).
+
+          ### Top findings
+
+          \`\`\`
+          $(python -c "
+          import json
+          with open('bandit-results.json') as f:
+              d = json.load(f)
+          for r in d.get('results', [])[:15]:
+              sev = r['issue_severity']
+              con = r['issue_confidence']
+              text = r['issue_text']
+              loc = r['filename'] + ':' + str(r['line_number'])
+              print(f'[{sev}/{con}] {loc} — {text}')
+          ")
+          \`\`\`"
+
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body "$BODY"
+            echo "Updated existing issue #$EXISTING"
+          else
+            gh issue create \
+              --title "🔴 Bandit security findings (${{ github.ref_name }})" \
+              --body "$BODY" \
+              --label "$LABEL"
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Semgrep — Python + TypeScript SAST
+  # ---------------------------------------------------------------------------
+  semgrep:
+    name: Semgrep (Python + TypeScript SAST)
+    runs-on: ubuntu-latest
+    container:
+      image: returnthecrowd/semgrep:latest
+    if: github.actor != 'dependabot[bot]'
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Run Semgrep
+        id: semgrep
+        run: |
+          semgrep \
+            --config p/python \
+            --config p/secrets \
+            --config p/typescript \
+            --json \
+            --output semgrep-results.json \
+            src/ frontend/src/ || true
+
+          ISSUES=$(python3 -c "
+          import json, sys
+          with open('semgrep-results.json') as f:
+              d = json.load(f)
+          results = d.get('results', [])
+          errors  = d.get('errors', [])
+          highs = [r for r in results if r.get('extra', {}).get('severity', '') in ('ERROR', 'WARNING')]
+          print(f'{len(results)} findings ({len(errors)} parse errors)')
+          sys.exit(1 if results else 0)
+          " 2>&1) || echo "SEMGREP_FINDINGS=true" >> "$GITHUB_ENV"
+          echo "SEMGREP_SUMMARY=$ISSUES" >> "$GITHUB_ENV"
+
+      - name: Upload Semgrep results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: semgrep-results
+          path: semgrep-results.json
+          retention-days: 30
+
+      - name: Open / update GitHub Issue on findings
+        if: env.SEMGREP_FINDINGS == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          LABEL="security/semgrep"
+          gh label create "$LABEL" --color "D93F0B" --description "Semgrep SAST finding" 2>/dev/null || true
+
+          EXISTING=$(gh issue list --label "$LABEL" --state open --json number --jq '.[0].number' 2>/dev/null)
+
+          BODY="## Semgrep Security Findings
+
+          **Run:** [\`${{ github.sha }}\`](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          **Branch:** \`${{ github.ref_name }}\`
+          **Summary:** ${{ env.SEMGREP_SUMMARY }}
+
+          Download the full \`semgrep-results.json\` artifact from the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).
+
+          ### Top findings
+
+          \`\`\`
+          $(python3 -c "
+          import json
+          with open('semgrep-results.json') as f:
+              d = json.load(f)
+          for r in d.get('results', [])[:15]:
+              sev  = r.get('extra', {}).get('severity', '?')
+              rule = r.get('check_id', '?')
+              path = r.get('path', '?')
+              line = r.get('start', {}).get('line', '?')
+              msg  = r.get('extra', {}).get('message', '')[:120]
+              print(f'[{sev}] {path}:{line} ({rule}) — {msg}')
+          ")
+          \`\`\`"
+
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body "$BODY"
+          else
+            gh issue create \
+              --title "🟠 Semgrep security findings (${{ github.ref_name }})" \
+              --body "$BODY" \
+              --label "$LABEL"
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Trivy — filesystem scan (dependencies + Terraform IaC)
+  # ---------------------------------------------------------------------------
+  trivy-fs:
+    name: Trivy (filesystem — deps + IaC)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@0.31.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: json
+          output: trivy-fs-results.json
+          severity: HIGH,CRITICAL
+          exit-code: '0'
+
+      - name: Check for findings
+        id: check
+        run: |
+          ISSUES=$(python3 -c "
+          import json, sys
+          with open('trivy-fs-results.json') as f:
+              d = json.load(f)
+          results = d.get('Results', [])
+          total = sum(len(r.get('Vulnerabilities') or []) + len(r.get('Misconfigurations') or []) for r in results)
+          highs = sum(
+              len([v for v in (r.get('Vulnerabilities') or []) if v.get('Severity') in ('HIGH','CRITICAL')])
+              + len([m for m in (r.get('Misconfigurations') or []) if m.get('Severity') in ('HIGH','CRITICAL')])
+              for r in results
+          )
+          print(f'{total} issues ({highs} HIGH/CRITICAL)')
+          sys.exit(1 if total else 0)
+          " 2>&1) || echo "TRIVY_FS_FINDINGS=true" >> "$GITHUB_ENV"
+          echo "TRIVY_FS_SUMMARY=$ISSUES" >> "$GITHUB_ENV"
+
+      - name: Upload Trivy fs results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-fs-results
+          path: trivy-fs-results.json
+          retention-days: 30
+
+      - name: Open / update GitHub Issue on findings
+        if: env.TRIVY_FS_FINDINGS == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          LABEL="security/trivy"
+          gh label create "$LABEL" --color "E4E669" --description "Trivy security finding" 2>/dev/null || true
+
+          EXISTING=$(gh issue list --label "$LABEL" --state open --json number --jq '.[0].number' 2>/dev/null)
+
+          BODY="## Trivy Filesystem Scan Findings
+
+          **Run:** [\`${{ github.sha }}\`](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          **Branch:** \`${{ github.ref_name }}\`
+          **Summary:** ${{ env.TRIVY_FS_SUMMARY }}
+          **Scope:** Python dependencies, npm dependencies, Terraform IaC (\`infra/\`)
+
+          Download the full \`trivy-fs-results.json\` artifact from the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).
+
+          ### Top findings
+
+          \`\`\`
+          $(python3 -c "
+          import json
+          with open('trivy-fs-results.json') as f:
+              d = json.load(f)
+          count = 0
+          for r in d.get('Results', []):
+              target = r.get('Target', '')
+              for v in (r.get('Vulnerabilities') or []):
+                  if count >= 15: break
+                  sev = v.get('Severity', '?')
+                  vid = v.get('VulnerabilityID', '?')
+                  pkg = v.get('PkgName', '?')
+                  title = v.get('Title', '')[:80]
+                  print(f'[{sev}] {target} — {pkg} {vid}: {title}')
+                  count += 1
+              for m in (r.get('Misconfigurations') or []):
+                  if count >= 15: break
+                  sev = m.get('Severity', '?')
+                  mid = m.get('ID', '?')
+                  title = m.get('Title', '')[:80]
+                  print(f'[{sev}] {target} — {mid}: {title}')
+                  count += 1
+          ")
+          \`\`\`"
+
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body "$BODY"
+          else
+            gh issue create \
+              --title "🟡 Trivy filesystem findings (${{ github.ref_name }})" \
+              --body "$BODY" \
+              --label "$LABEL"
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Trivy — Docker image scan (push to main only, image must exist in ECR)
+  # ---------------------------------------------------------------------------
+  trivy-image:
+    name: Trivy (Docker image)
+    runs-on: ubuntu-latest
+    # Only run on push to main — the image must already be built and pushed
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Log in to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Run Trivy image scan
+        uses: aquasecurity/trivy-action@0.31.0
+        with:
+          scan-type: image
+          image-ref: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/argus-for-athena-prod:latest
+          format: json
+          output: trivy-image-results.json
+          severity: HIGH,CRITICAL
+          exit-code: '0'
+
+      - name: Check for findings
+        id: check
+        run: |
+          ISSUES=$(python3 -c "
+          import json, sys
+          with open('trivy-image-results.json') as f:
+              d = json.load(f)
+          results = d.get('Results', [])
+          total = sum(len(r.get('Vulnerabilities') or []) for r in results)
+          highs = sum(
+              len([v for v in (r.get('Vulnerabilities') or []) if v.get('Severity') in ('HIGH','CRITICAL')])
+              for r in results
+          )
+          print(f'{total} vulns ({highs} HIGH/CRITICAL)')
+          sys.exit(1 if total else 0)
+          " 2>&1) || echo "TRIVY_IMAGE_FINDINGS=true" >> "$GITHUB_ENV"
+          echo "TRIVY_IMAGE_SUMMARY=$ISSUES" >> "$GITHUB_ENV"
+
+      - name: Upload Trivy image results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-image-results
+          path: trivy-image-results.json
+          retention-days: 30
+
+      - name: Open / update GitHub Issue on findings
+        if: env.TRIVY_IMAGE_FINDINGS == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          LABEL="security/trivy"
+          gh label create "$LABEL" --color "E4E669" --description "Trivy security finding" 2>/dev/null || true
+
+          EXISTING=$(gh issue list --label "$LABEL" --state open --json number --jq '.[0].number' 2>/dev/null)
+
+          BODY="## Trivy Docker Image Scan Findings
+
+          **Run:** [\`${{ github.sha }}\`](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          **Image:** \`argus-for-athena-prod:latest\`
+          **Summary:** ${{ env.TRIVY_IMAGE_SUMMARY }}
+
+          Download the full \`trivy-image-results.json\` artifact from the [workflow run](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).
+
+          ### Top findings
+
+          \`\`\`
+          $(python3 -c "
+          import json
+          with open('trivy-image-results.json') as f:
+              d = json.load(f)
+          count = 0
+          for r in d.get('Results', []):
+              target = r.get('Target', '')
+              for v in (r.get('Vulnerabilities') or []):
+                  if count >= 15: break
+                  sev = v.get('Severity', '?')
+                  vid = v.get('VulnerabilityID', '?')
+                  pkg = v.get('PkgName', '?')
+                  fix = v.get('FixedVersion', 'no fix')
+                  title = v.get('Title', '')[:70]
+                  print(f'[{sev}] {target} — {pkg} {vid} (fix: {fix}): {title}')
+                  count += 1
+          ")
+          \`\`\`"
+
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body "$BODY"
+          else
+            gh issue create \
+              --title "🟡 Trivy image findings — ${{ github.sha }}" \
+              --body "$BODY" \
+              --label "$LABEL"
+          fi
