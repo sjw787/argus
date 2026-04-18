@@ -33,6 +33,8 @@ interface EditorStore {
   openTab: (opts: { title: string; sql: string; database: string }) => void
   openErDiagramTab: (database: string) => void
   closeTab: (id: string) => void
+  closeOtherTabs: (id: string) => void
+  closeAllTabs: () => void
   setActiveTab: (id: string) => void
   updateTab: (id: string, updates: Partial<EditorTab>) => void
   getActiveTab: () => EditorTab | undefined
@@ -100,6 +102,15 @@ export const useEditorStore = create<EditorStore>()(
           return { tabs, activeTabId }
         })
       },
+
+      closeOtherTabs: (id: string) => {
+        set(state => ({
+          tabs: state.tabs.filter(t => t.id === id),
+          activeTabId: id,
+        }))
+      },
+
+      closeAllTabs: () => set({ tabs: [], activeTabId: null }),
 
       setActiveTab: (id: string) => set({ activeTabId: id }),
 
