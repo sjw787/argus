@@ -401,34 +401,44 @@ export function SqlEditorPanel({ tabId }: Props) {
     setExplainPlanType(planType)
     setExplainDropdownOpen(false)
     setIsExplaining(true)
+    const openPlanTab = (body: string, label: string) => {
+      useEditorStore.getState().openTab({
+        title: `${label} (${planType}): ${tab.database}`,
+        sql: body,
+        database: tab.database,
+      })
+    }
     try {
       const data = await api.explainQuery({ sql: tab.sql, database: tab.database, plan_type: planType })
       const poll = async () => {
-        const detail = await api.getQuery(data.query_execution_id)
-        const state = detail.status.state
-        if (state === 'RUNNING' || state === 'QUEUED') {
-          setTimeout(poll, 1500)
-          return
-        }
-        setIsExplaining(false)
-        if (state === 'SUCCEEDED') {
-          try {
-            const results = await api.getQueryResults(data.query_execution_id, 5000)
-            // Plan text is in the first column of each row; join into a single block
-            const planText = results.rows.map(r => r[0] ?? '').join('\n')
-            useEditorStore.getState().openTab({
-              title: `Plan (${planType}): ${tab.database}`,
-              sql: planText,
-              database: tab.database,
-            })
-          } catch {
-            // Failed to fetch results — silently ignore
+        try {
+          const detail = await api.getQuery(data.query_execution_id)
+          const state = detail.status.state
+          if (state === 'RUNNING' || state === 'QUEUED') {
+            setTimeout(poll, 1500)
+            return
           }
+          setIsExplaining(false)
+          if (state === 'SUCCEEDED') {
+            const results = await api.getQueryResults(data.query_execution_id, 5000)
+            // Athena returns the plan as one row per line in column 0
+            const planText = results.rows.map(r => r[0] ?? '').join('\n')
+            openPlanTab(planText || '(empty plan returned)', 'Plan')
+          } else {
+            const reason = detail.status.state_change_reason ?? `Query ${state}`
+            openPlanTab(`-- EXPLAIN ${planType} failed (${state})\n-- ${reason}`, 'Plan error')
+          }
+        } catch (err) {
+          setIsExplaining(false)
+          const msg = err instanceof Error ? err.message : String(err)
+          openPlanTab(`-- EXPLAIN ${planType} failed while fetching results\n-- ${msg}`, 'Plan error')
         }
       }
       poll()
-    } catch {
+    } catch (err) {
       setIsExplaining(false)
+      const msg = err instanceof Error ? err.message : String(err)
+      openPlanTab(`-- EXPLAIN ${planType} submission failed\n-- ${msg}`, 'Plan error')
     }
   }, [tab?.database, tab?.sql])
 
