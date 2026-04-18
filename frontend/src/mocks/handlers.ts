@@ -34,6 +34,35 @@ export const handlers = [
     })
   ),
 
+  http.get('/api/v1/catalog/databases/:dbName', () =>
+    HttpResponse.json({ name: 'test_db', description: '', parameters: {}, workgroup: null })
+  ),
+
+  http.get('/api/v1/catalog/databases/:dbName/tables', () =>
+    HttpResponse.json([
+      { name: 'users', database_name: 'test_db', table_type: 'EXTERNAL_TABLE', columns: [] },
+    ])
+  ),
+
+  http.get('/api/v1/catalog/databases/:dbName/tables/:tableName', () =>
+    HttpResponse.json({
+      name: 'users',
+      database_name: 'test_db',
+      table_type: 'EXTERNAL_TABLE',
+      columns: [{ name: 'id', type: 'int', comment: '' }],
+      parameters: {},
+      partition_keys: [],
+    })
+  ),
+
+  http.get('/api/v1/catalog/databases/:dbName/tables/:tableName/partitions', () =>
+    HttpResponse.json([])
+  ),
+
+  http.get('/api/v1/catalog/databases/:dbName/er-diagram', () =>
+    HttpResponse.json({ tables: [], relationships: [] })
+  ),
+
   http.get('/api/v1/workgroups', () =>
     HttpResponse.json([{ name: 'primary' }])
   ),
