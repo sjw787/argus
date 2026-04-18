@@ -88,6 +88,10 @@ Update the test count and module table in **[CONSIDERATIONS.md](CONSIDERATIONS.m
 
 ## When You Conduct a Code Review
 
+Before starting, read the dedicated review guides:
+- **[CODE_REVIEW.md](CODE_REVIEW.md)** — full checklist: correctness, quality, tests, deps, infra, docs
+- **[SECURITY_REVIEW.md](SECURITY_REVIEW.md)** — focused security checklist: auth, injection, tenant isolation, CORS, IAM, frontend XSS
+
 Append findings to the **Code Reviews** section in **[CONSIDERATIONS.md](CONSIDERATIONS.md)**:
 
 1. Add a new `### Review N — <Topic> (<Month Year>)` subsection
