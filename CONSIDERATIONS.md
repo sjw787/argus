@@ -10,7 +10,7 @@ The premise: *AI can write the code, but a human still has to own the outcome.* 
 
 A full test suite covers the core application logic. Tests were written alongside the code and validated against the real application behaviour.
 
-**224 tests passing across 15 test modules:**
+**264 tests passing across 17 test modules:**
 
 | Module | What It Covers |
 |--------|---------------|
@@ -27,6 +27,8 @@ A full test suite covers the core application logic. Tests were written alongsid
 | `test_session_store.py` | In-memory and DynamoDB session store backends (100% coverage) |
 | `test_sso_service.py` | SsoService: device-auth flow, polling, accounts/roles, credentials, profiles (100% coverage) |
 | `test_lambda_handler.py` | Lambda Mangum handler: invocation, API Gateway event routing (100% coverage) |
+| `test_aws_endpoints.py` | FIPS endpoint URL helper: service mapping, region interpolation, enable/disable (100% coverage) |
+| `test_audit_logger.py` | AuditLogger: enable/disable, field correctness, privacy guarantees, action classification, middleware integration |
 | `functional/test_query_flow.py` | HTTP-level execute → status → results flow; error cases |
 | `functional/test_export_flow.py` | HTTP-level export access control, CSV/JSON formats, error propagation |
 
@@ -34,10 +36,10 @@ Tests use `pytest` with `unittest.mock` to isolate AWS API calls. No real AWS cr
 
 ```bash
 PYTHONPATH=src python -m pytest tests/ -q
-# 224 passed
+# 264 passed
 ```
 
-Current line coverage: **58%** (target: 87%). Key service modules (`sso_service.py`, `session_store.py`, `lambda_handler.py`) are now at 100% coverage. Remaining gap is concentrated in the Typer CLI layer (0%) and some router dependency paths. Coverage is enforced by a pre-push ratchet hook — it can only go up between pushes.
+Current line coverage: **59%** (target: 87%). Key service modules (`sso_service.py`, `session_store.py`, `lambda_handler.py`, `aws_endpoints.py`) are now at 100% coverage. Remaining gap is concentrated in the Typer CLI layer (0%) and some router dependency paths. Coverage is enforced by a pre-push ratchet hook — it can only go up between pushes.
 
 ---
 
@@ -94,6 +96,8 @@ Beyond the code review fixes, the following security practices are in place:
 - **Transport**: HTTPS enforced end-to-end (CloudFront → API Gateway → Lambda). HTTP redirected to HTTPS at CloudFront.
 - **CORS**: Locked to the explicit `ARGUS_CORS_ORIGINS` env var. In Lambda mode the application refuses to start if this is unset — wildcard origins (`*`) are never combined with `allow_credentials=True`.
 - **Dependency scanning**: GitHub Actions CI runs on every push.
+- **Audit logging**: Available for government deployments via `enable_audit_logging = true`. Logs metadata only — SQL text and result data are never captured. CloudWatch log group is append-only (write-only IAM permissions). See [docs/fedramp-deployment.md](docs/fedramp-deployment.md).
+- **FIPS / GovCloud**: `use_fips_endpoints`, `govcloud`, and `fips_container` Terraform variables enable FedRAMP-compatible infrastructure with zero impact on standard deployments.
 
 ---
 

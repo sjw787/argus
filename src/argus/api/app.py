@@ -16,6 +16,7 @@ from argus.api.routers import queries, catalog, workgroups
 from argus.api.routers import config as config_router
 from argus.api.routers import export, auth
 from argus.api.dependencies import set_config_path
+from argus.api.middleware import AuditMiddleware
 
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -117,6 +118,9 @@ def create_app(config_path: Optional[Path] = None) -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Audit middleware fires after every request; no-ops when audit logging is disabled.
+    app.add_middleware(AuditMiddleware)
 
     app.include_router(queries.router, prefix="/api/v1")
     app.include_router(catalog.router, prefix="/api/v1")

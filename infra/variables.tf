@@ -77,3 +77,46 @@ variable "manage_sso" {
   type        = bool
   default     = false
 }
+
+# ── Government / compliance options (all disabled by default) ──────────────────
+
+variable "enable_audit_logging" {
+  description = <<-EOT
+    When true, create a CloudWatch Log Group (/argus/{environment}/audit) with
+    365-day retention and grant the Lambda role permission to write audit events.
+    Required for FedRAMP/GovRAMP and NIST 800-53 AU-2/AU-3 compliance.
+    Has no effect on standard (non-government) deployments when left false.
+  EOT
+  type        = bool
+  default     = false
+}
+
+variable "govcloud" {
+  description = <<-EOT
+    When true, use the aws-us-gov ARN partition in all IAM and resource ARN
+    constructions. Set aws_region to us-gov-west-1 or us-gov-east-1 when
+    deploying into AWS GovCloud (US).
+  EOT
+  type        = bool
+  default     = false
+}
+
+variable "use_fips_endpoints" {
+  description = <<-EOT
+    When true, configure the backend Lambda to call FIPS-validated AWS service
+    endpoints (Athena, Glue, S3, STS). Required for FedRAMP High and GovCloud
+    deployments. Endpoints must be available in the target region.
+  EOT
+  type        = bool
+  default     = false
+}
+
+variable "fips_container" {
+  description = <<-EOT
+    When true, pass FIPS_CONTAINER=true to the Docker build so that the image
+    enables FIPS-mode OpenSSL. Works in combination with use_fips_endpoints.
+    Requires the container runtime host to be FIPS-enabled (GovCloud EC2/Fargate).
+  EOT
+  type        = bool
+  default     = false
+}

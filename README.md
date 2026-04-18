@@ -209,6 +209,21 @@ tests/                 # pytest suite
 
 ---
 
+## Government Deployment (FedRAMP / GovRAMP)
+
+Argus supports deployment in federal environments with all compliance features **opt-in** — a standard deployment is completely unchanged.
+
+| Capability | Terraform variable | Description |
+|---|---|---|
+| Audit logging | `enable_audit_logging = true` | Structured metadata records in CloudWatch (no SQL or result data) |
+| GovCloud | `govcloud = true` | Correct `aws-us-gov` ARN partition for all IAM resources |
+| FIPS endpoints | `use_fips_endpoints = true` | Route boto3 calls through FIPS-validated AWS endpoints |
+| FIPS container | `fips_container = true` | Enable FIPS-mode OpenSSL in the container image |
+
+See **[docs/fedramp-deployment.md](docs/fedramp-deployment.md)** for the full checklist, audit log schema, and incident response guide.
+
+---
+
 ## Documentation
 
 | Doc | Description |

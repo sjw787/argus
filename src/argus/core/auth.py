@@ -43,19 +43,22 @@ def reset_session_cache() -> None:
 def get_athena_client(
     profile: Optional[str] = None,
     region: Optional[str] = None,
+    endpoint_url: Optional[str] = None,
 ):
-    return get_session(profile, region).client("athena")
+    return get_session(profile, region).client("athena", endpoint_url=endpoint_url)
 
 
 def get_glue_client(
     profile: Optional[str] = None,
     region: Optional[str] = None,
+    endpoint_url: Optional[str] = None,
 ):
-    return get_session(profile, region).client("glue")
+    return get_session(profile, region).client("glue", endpoint_url=endpoint_url)
 
 
 def get_s3_client(
     profile: Optional[str] = None,
     region: Optional[str] = None,
+    endpoint_url: Optional[str] = None,
 ):
-    return get_session(profile, region).client("s3")
+    return get_session(profile, region).client("s3", endpoint_url=endpoint_url)

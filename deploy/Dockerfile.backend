@@ -1,7 +1,19 @@
 FROM public.ecr.aws/lambda/python:3.12
 
+# FIPS_CONTAINER=true: enable FIPS-mode OpenSSL in the container.
+# Used for FedRAMP/GovCloud deployments where the host runtime is also FIPS-enabled.
+# Pass --build-arg FIPS_CONTAINER=true at build time (set via Terraform fips_container var).
+ARG FIPS_CONTAINER=false
+
 # Install build dependencies
 RUN dnf install -y gcc gcc-c++ && dnf clean all
+
+# Enable FIPS mode when requested (requires FIPS-enabled host runtime for full effect)
+RUN if [ "$FIPS_CONTAINER" = "true" ]; then \
+      fips-mode-setup --enable 2>/dev/null || \
+      update-crypto-policies --set FIPS 2>/dev/null || \
+      echo "FIPS policy tool unavailable — FIPS enforcement delegated to host runtime"; \
+    fi
 
 WORKDIR ${LAMBDA_TASK_ROOT}
 

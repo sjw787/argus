@@ -86,7 +86,32 @@ Contact your administrator for details specific to your deployment.
 
 ---
 
-## Open Source
+## Audit Logging (Government Deployments Only)
+
+Audit logging is **disabled by default** and must be explicitly enabled by a deployer via Terraform (`enable_audit_logging = true`). It is intended for FedRAMP / GovRAMP compliance and has no effect on standard deployments.
+
+When enabled, each HTTP request produces one structured metadata record in a dedicated CloudWatch Log Group. The following fields are captured:
+
+| Field | Description |
+|---|---|
+| `timestamp` | UTC time of the event |
+| `user_identity` | Username, email, or credential ID |
+| `action_type` | Category (e.g., `QUERY_EXECUTE`, `EXPORT`, `LOGIN`) |
+| `http_method` + `path` | API endpoint called |
+| `status_code` | HTTP response status |
+| `duration_ms` | Request processing time |
+| `database` / `workgroup` | Query parameters, when present |
+
+**What is NEVER written to audit logs** (same guarantees as the rest of this document):
+- SQL query text
+- Query results, column values, or row data
+- AWS credentials or session tokens
+
+The CloudWatch log group is append-only. Argus has no permission to read or delete audit records (satisfying FedRAMP non-repudiation requirements).
+
+See [docs/fedramp-deployment.md](docs/fedramp-deployment.md) for details.
+
+---
 
 Argus for Athena is open source. You can inspect every line of code to verify these claims:  
 [https://github.com/sjw787/ArgusForAthena](https://github.com/sjw787/ArgusForAthena)

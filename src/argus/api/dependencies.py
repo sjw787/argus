@@ -19,6 +19,7 @@ from argus.core.auth import (
 from argus.core.session_store import get_session as get_stored_session
 from argus.models.schemas import AppConfig
 from argus.services.athena_service import AthenaService
+from argus.services.aws_endpoints import get_endpoint_url
 from argus.services.catalog_service import CatalogService
 from argus.services.workgroup_service import WorkgroupService
 
@@ -158,9 +159,14 @@ def get_athena_service(
     x_credential_id: Annotated[Optional[str], Header()] = None,
 ) -> AthenaService:
     cfg_profile = profile or config.aws.profile
-    cfg_region = region or config.aws.region
+    cfg_region = region or config.aws.region or "us-east-1"
+    endpoint = get_endpoint_url("athena", cfg_region)
     session = _boto3_session_from_credential_id(x_credential_id, cfg_region)
-    client = session.client("athena") if session else get_athena_client(cfg_profile, cfg_region)
+    client = (
+        session.client("athena", endpoint_url=endpoint)
+        if session
+        else get_athena_client(cfg_profile, cfg_region, endpoint_url=endpoint)
+    )
     return AthenaService(client, config)
 
 
@@ -171,9 +177,14 @@ def get_catalog_service(
     x_credential_id: Annotated[Optional[str], Header()] = None,
 ) -> CatalogService:
     cfg_profile = profile or config.aws.profile
-    cfg_region = region or config.aws.region
+    cfg_region = region or config.aws.region or "us-east-1"
+    endpoint = get_endpoint_url("glue", cfg_region)
     session = _boto3_session_from_credential_id(x_credential_id, cfg_region)
-    client = session.client("glue") if session else get_glue_client(cfg_profile, cfg_region)
+    client = (
+        session.client("glue", endpoint_url=endpoint)
+        if session
+        else get_glue_client(cfg_profile, cfg_region, endpoint_url=endpoint)
+    )
     return CatalogService(client, config)
 
 
@@ -184,9 +195,14 @@ def get_workgroup_service(
     x_credential_id: Annotated[Optional[str], Header()] = None,
 ) -> WorkgroupService:
     cfg_profile = profile or config.aws.profile
-    cfg_region = region or config.aws.region
+    cfg_region = region or config.aws.region or "us-east-1"
+    endpoint = get_endpoint_url("athena", cfg_region)
     session = _boto3_session_from_credential_id(x_credential_id, cfg_region)
-    client = session.client("athena") if session else get_athena_client(cfg_profile, cfg_region)
+    client = (
+        session.client("athena", endpoint_url=endpoint)
+        if session
+        else get_athena_client(cfg_profile, cfg_region, endpoint_url=endpoint)
+    )
     return WorkgroupService(client, config)
 
 
@@ -197,8 +213,9 @@ def get_s3(
     x_credential_id: Annotated[Optional[str], Header()] = None,
 ):
     cfg_profile = profile or config.aws.profile
-    cfg_region = region or config.aws.region
+    cfg_region = region or config.aws.region or "us-east-1"
+    endpoint = get_endpoint_url("s3", cfg_region)
     session = _boto3_session_from_credential_id(x_credential_id, cfg_region)
     if session:
-        return session.client("s3")
-    return get_s3_client(cfg_profile, cfg_region)
+        return session.client("s3", endpoint_url=endpoint)
+    return get_s3_client(cfg_profile, cfg_region, endpoint_url=endpoint)

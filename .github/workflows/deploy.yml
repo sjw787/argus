@@ -127,7 +127,12 @@ jobs:
             --region "${AWS_REGION}" \
             --image-scanning-configuration scanOnPush=true \
             2>/dev/null || true
-          docker build -f deploy/Dockerfile.backend -t "${ECR_REPO}:${IMAGE_TAG}" -t "${ECR_REPO}:latest" .
+          docker build \
+            -f deploy/Dockerfile.backend \
+            --build-arg FIPS_CONTAINER="${TF_VAR_fips_container:-false}" \
+            -t "${ECR_REPO}:${IMAGE_TAG}" \
+            -t "${ECR_REPO}:latest" \
+            .
           docker push "${ECR_REPO}:${IMAGE_TAG}"
           docker push "${ECR_REPO}:latest"
           echo "image_uri=${ECR_REPO}:${IMAGE_TAG}" >> $GITHUB_OUTPUT

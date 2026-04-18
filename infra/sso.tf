@@ -44,14 +44,14 @@ resource "aws_ssoadmin_managed_policy_attachment" "athena_full" {
   count              = var.manage_sso ? 1 : 0
   instance_arn       = local.sso_instance_arn
   permission_set_arn = aws_ssoadmin_permission_set.athena_access[0].arn
-  managed_policy_arn = "arn:aws:iam::aws:policy/AmazonAthenaFullAccess"
+  managed_policy_arn = "arn:${local.partition}:iam::aws:policy/AmazonAthenaFullAccess"
 }
 
 resource "aws_ssoadmin_managed_policy_attachment" "glue_readonly" {
   count              = var.manage_sso ? 1 : 0
   instance_arn       = local.sso_instance_arn
   permission_set_arn = aws_ssoadmin_permission_set.athena_access[0].arn
-  managed_policy_arn = "arn:aws:iam::aws:policy/AWSGlueConsoleFullAccess"
+  managed_policy_arn = "arn:${local.partition}:iam::aws:policy/AWSGlueConsoleFullAccess"
 }
 
 # Group: ArgusUsers — add members via the Identity Center console or identitystore_user resources

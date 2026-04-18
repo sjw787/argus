@@ -18,7 +18,20 @@ locals {
     ARGUS_COGNITO_CLIENT_ID    = length(aws_cognito_user_pool_client.app) > 0 ? aws_cognito_user_pool_client.app[0].id : ""
   } : {}
 
-  lambda_env = merge(local.lambda_env_base, local.lambda_env_cognito)
+  lambda_env_compliance = merge(
+    var.enable_audit_logging ? {
+      ARGUS_AUDIT_LOGGING   = "true"
+      ARGUS_AUDIT_LOG_GROUP = aws_cloudwatch_log_group.audit[0].name
+    } : {},
+    var.use_fips_endpoints ? {
+      ARGUS_USE_FIPS_ENDPOINTS = "true"
+    } : {},
+    var.govcloud ? {
+      ARGUS_AWS_PARTITION = "aws-us-gov"
+    } : {},
+  )
+
+  lambda_env = merge(local.lambda_env_base, local.lambda_env_cognito, local.lambda_env_compliance)
 }
 
 # IAM role for Lambda
@@ -39,12 +52,12 @@ resource "aws_iam_role" "lambda" {
 
 resource "aws_iam_role_policy_attachment" "lambda_basic" {
   role       = aws_iam_role.lambda.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+  policy_arn = "arn:${local.partition}:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_athena" {
   role       = aws_iam_role.lambda.name
-  policy_arn = "arn:aws:iam::aws:policy/AmazonAthenaFullAccess"
+  policy_arn = "arn:${local.partition}:iam::aws:policy/AmazonAthenaFullAccess"
 }
 
 resource "aws_iam_role_policy" "lambda_custom" {
@@ -84,11 +97,11 @@ resource "aws_iam_role_policy" "lambda_custom" {
         Resource = [
           aws_s3_bucket.athena_metadata.arn,
           "${aws_s3_bucket.athena_metadata.arn}/*",
-          "arn:aws:s3:::${replace(replace(var.output_location, "s3://", ""), "/", "")}",
-          "arn:aws:s3:::${replace(replace(var.output_location, "s3://", ""), "/", "")}/*",
+          "arn:${local.partition}:s3:::${replace(replace(var.output_location, "s3://", ""), "/", "")}",
+          "arn:${local.partition}:s3:::${replace(replace(var.output_location, "s3://", ""), "/", "")}/*",
           # Broad wildcard for the bucket prefix — narrow if output_location contains a sub-path
-          "arn:aws:s3:::${split("/", replace(var.output_location, "s3://", ""))[0]}",
-          "arn:aws:s3:::${split("/", replace(var.output_location, "s3://", ""))[0]}/*",
+          "arn:${local.partition}:s3:::${split("/", replace(var.output_location, "s3://", ""))[0]}",
+          "arn:${local.partition}:s3:::${split("/", replace(var.output_location, "s3://", ""))[0]}/*",
         ]
       },
       {

@@ -45,3 +45,10 @@ provider "aws" {
 }
 
 data "aws_caller_identity" "current" {}
+
+locals {
+  # AWS ARN partition — switches to aws-us-gov when govcloud = true.
+  # Used throughout all IAM and resource ARN string interpolations so that a
+  # single variable controls correct partition selection for GovCloud deployments.
+  partition = var.govcloud ? "aws-us-gov" : "aws"
+}
