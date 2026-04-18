@@ -31,8 +31,16 @@ hosted_zone_id   = "ZXXXXXXXXXXXXX"
 output_location  = "s3://my-athena-results/prefix/"
 ```
 
-The Lambda environment variables `ARGUS_AUTH_MODE`, `ARGUS_COGNITO_USER_POOL_ID`, and
-`ARGUS_COGNITO_CLIENT_ID` are set automatically by Terraform — no manual configuration needed.
+The Lambda environment variables `ARGUS_AUTH_MODE`, `ARGUS_COGNITO_USER_POOL_ID`,
+`ARGUS_COGNITO_CLIENT_ID`, and `ARGUS_COGNITO_DOMAIN` are set automatically by Terraform — no
+manual configuration needed.
+
+| Variable | Description | Example |
+|---|---|---|
+| `ARGUS_AUTH_MODE` | Set to `cognito` | `cognito` |
+| `ARGUS_COGNITO_USER_POOL_ID` | Cognito user pool ID | `us-east-1_AbCdEfGhI` |
+| `ARGUS_COGNITO_CLIENT_ID` | App client ID | `1abc2defghijk3lmno4pqrstu` |
+| `ARGUS_COGNITO_DOMAIN` | Cognito hosted UI domain (without `https://`) | `argus-prod.auth.us-east-1.amazoncognito.com` |
 
 ## Terraform Setup
 
@@ -84,3 +92,13 @@ Cognito resources. Make sure to update your frontend configuration accordingly.
 ```bash
 terraform apply -var="auth_mode=sso"
 ```
+
+## Sign Out
+
+Clicking **Sign Out** in the Settings panel redirects the browser to the Cognito logout endpoint:
+
+```
+https://<cognito_domain>/logout?client_id=<client_id>&logout_uri=<app_url>
+```
+
+This invalidates the Cognito session (and any active refresh token). The user is then redirected back to the Cognito hosted UI login page. The frontend clears its local token state before initiating the redirect.

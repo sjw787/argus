@@ -124,7 +124,7 @@ Create an IAM role with a trust policy allowing your repository:
         "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
       },
       "StringLike": {
-        "token.actions.githubusercontent.com:sub": "repo:YOUR_ORG/Argus for Athena:*"
+        "token.actions.githubusercontent.com:sub": "repo:sjw787/argus:*"
       }
     }
   }]

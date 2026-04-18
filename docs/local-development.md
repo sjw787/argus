@@ -23,8 +23,8 @@ You also need an AWS account with access to Athena and the Glue catalog, plus an
 ### 1. Clone the repository
 
 ```bash
-git clone git@github.com:sjw787/ArgusForAthena.git
-cd Argus for Athena
+git clone git@github.com:sjw787/argus.git
+cd argus
 ```
 
 ### 2. Set up the Python virtual environment
@@ -128,6 +128,7 @@ locked_settings: []
 | `ARGUS_PROFILE` | `aws.profile` | `my-profile` |
 | `ARGUS_OUTPUT_LOCATION` | `defaults.output_location` | `s3://bucket/path/` |
 | `ARGUS_AUTH_MODE` | `auth_mode` | `none` |
+| `ARGUS_COGNITO_DOMAIN` | Cognito hosted UI domain (Cognito auth mode only) | `argus-prod.auth.us-east-1.amazoncognito.com` |
 | `ARGUS_CONFIG` | entire config as JSON | `'{"aws":{"region":"us-east-1"}}'` |
 
 ---
@@ -184,8 +185,18 @@ The Vite dev server runs on `http://localhost:5173` and proxies all `/api` reque
 
 ### Python tests
 
+The suite currently has **154 tests** at **~51% coverage**.
+
 ```bash
 source venv/bin/activate
+
+# Run all tests (quiet summary)
+PYTHONPATH=src python -m pytest tests/ -q
+
+# Run with coverage report
+PYTHONPATH=src python -m pytest tests/ -q --cov=argus --cov-report=term-missing
+
+# Verbose output
 PYTHONPATH=src python -m pytest tests/ -v
 ```
 
@@ -339,3 +350,16 @@ With `auth_mode: none` (no-auth mode for local dev without SSO):
 - In dev mode, Vite proxies `/api` → `http://localhost:8000` (configured in `frontend/vite.config.ts`).
 - In prod mode, FastAPI serves the built frontend from `src/argus/api/static/` and handles `/api` routes natively.
 - Long-running query status is streamed via Server-Sent Events (`sse-starlette`).
+
+### UI features
+
+The frontend provides a full SQL IDE experience:
+
+- **SQL Editor** — multiple tabs, run with Ctrl/Cmd+Enter, run selected text, multi-statement queries (split by `;`), format button, auto-limit for SELECT queries
+- **Results Grid** — paginated AG Grid with sortable/resizable columns; right-click any cell to filter or inject a WHERE clause into the editor; export to CSV/JSON/Excel/Parquet
+- **Database Navigator** (left pane) — lazy-loaded Glue catalog tree grouped by workgroup; right-click a table to query, view DDL, or open an ER diagram
+- **ER Diagram Tab** — interactive entity-relationship diagram for a database; one tab per database, zoom/pan/drag
+- **Query History** pane (bottom) — recent executions with status, duration, and row count; click to re-open in a new tab; collapsed state persists across reloads
+- **Settings** — theme, autocomplete, diagnostics, auto-limit, format style, workgroup assignments, and Sign Out
+
+See [`docs/ui-features.md`](ui-features.md) for the full UI reference.

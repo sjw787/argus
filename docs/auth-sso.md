@@ -48,3 +48,13 @@ The table `argus-sessions` (configurable via `ARGUS_SESSION_TABLE`) stores:
 - Role credentials (`creds:{session_id}`) — TTL: 1 hour
 
 Ensure DynamoDB TTL is enabled on the `expires_at` attribute.
+
+## Sign Out
+
+Clicking **Sign Out** in the Settings panel calls `POST /api/auth/signout`.
+
+- The backend deletes the session entry from DynamoDB (Lambda) or clears it from the in-memory store (local dev).
+- The frontend clears its stored `credential_id` from Zustand (and `localStorage`).
+- The UI returns to the login screen.
+
+The sign-out endpoint invalidates server-side credentials immediately — any subsequent API call with the old `X-Credential-Id` header will be rejected.
