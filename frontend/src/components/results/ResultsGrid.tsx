@@ -115,8 +115,10 @@ function addWhereCondition(sql: string, col: string, value: string | null, colTy
     // WHERE already exists — append AND
     const match = clauseRe.exec(trimmed)
     if (match) {
-      const indent = trimmed.slice(0, match.index).match(/(\s*)$/)?.[1] ?? lastLineIndent
-      return trimmed.slice(0, match.index) + `${indent}${kw('and')} ${predicate}\n` + trimmed.slice(match.index) + ';'
+      const before = trimmed.slice(0, match.index).trimEnd()
+      const after = trimmed.slice(match.index)
+      const indent = after.match(/^([ \t]*)/)?.[1] ?? lastLineIndent
+      return `${before}\n${indent}${kw('and')} ${predicate}\n${indent}` + after.trimStart() + ';'
     }
     return trimmed + `\n${lastLineIndent}${kw('and')} ${predicate};`
   }
@@ -124,8 +126,10 @@ function addWhereCondition(sql: string, col: string, value: string | null, colTy
   // No WHERE — insert before ORDER BY / GROUP BY / HAVING / LIMIT, or at end
   const match = clauseRe.exec(trimmed)
   if (match) {
-    const indent = trimmed.slice(0, match.index).match(/(\s*)$/)?.[1] ?? lastLineIndent
-    return trimmed.slice(0, match.index) + `${indent}${kw('where')} ${predicate}\n` + trimmed.slice(match.index) + ';'
+    const before = trimmed.slice(0, match.index).trimEnd()
+    const after = trimmed.slice(match.index)
+    const indent = after.match(/^([ \t]*)/)?.[1] ?? lastLineIndent
+    return `${before}\n${indent}${kw('where')} ${predicate}\n${indent}` + after.trimStart() + ';'
   }
   return trimmed + `\n${lastLineIndent}${kw('where')} ${predicate};`
 }
