@@ -61,9 +61,8 @@ function addWhereCondition(sql: string, col: string, value: string | null, colTy
   const upper = /\bSELECT\b/.test(sql) || /\bFROM\b/.test(sql)
   const kw = (s: string) => upper ? s.toUpperCase() : s.toLowerCase()
 
-  // Only quote the column name if it contains spaces or non-word characters
-  const needsQuote = /[^a-zA-Z0-9_]/.test(col)
-  const colRef = needsQuote ? `"${col}"` : col
+  // Always double-quote column names to match the style Athena uses for identifiers
+  const colRef = `"${col}"`
   const escapedCol = colRef.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 
   const formattedValue = formatSqlValue(value, colType)
