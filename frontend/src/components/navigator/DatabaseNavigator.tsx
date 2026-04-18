@@ -112,7 +112,7 @@ export function DatabaseNavigator() {
   const toggleWorkgroup = (name: string) => {
     setExpandedWorkgroups(prev => {
       const next = new Set(prev)
-      next.has(name) ? next.delete(name) : next.add(name)
+      if (next.has(name)) next.delete(name); else next.add(name)
       return next
     })
   }
@@ -120,7 +120,7 @@ export function DatabaseNavigator() {
   const toggleDb = (name: string) => {
     setExpandedDbs(prev => {
       const next = new Set(prev)
-      next.has(name) ? next.delete(name) : next.add(name)
+      if (next.has(name)) next.delete(name); else next.add(name)
       return next
     })
     setSelectedDatabase(name)
@@ -129,7 +129,7 @@ export function DatabaseNavigator() {
   const toggleTable = (key: string) => {
     setExpandedTables(prev => {
       const next = new Set(prev)
-      next.has(key) ? next.delete(key) : next.add(key)
+      if (next.has(key)) next.delete(key); else next.add(key)
       return next
     })
   }
@@ -431,7 +431,7 @@ function DatabaseNode({ db, isUnassigned, expanded, expandedTables, onToggle, on
   const toggleFolder = (folder: string) =>
     setExpandedFolders(prev => {
       const next = new Set(prev)
-      next.has(folder) ? next.delete(folder) : next.add(folder)
+      if (next.has(folder)) next.delete(folder); else next.add(folder)
       return next
     })
 
@@ -703,7 +703,7 @@ function InformationSchemaNode({ onOpenTab, onInsert }: {
   const toggleTable = (name: string) => {
     setExpandedTables(prev => {
       const next = new Set(prev)
-      next.has(name) ? next.delete(name) : next.add(name)
+      if (next.has(name)) next.delete(name); else next.add(name)
       return next
     })
   }

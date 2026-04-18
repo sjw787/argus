@@ -225,18 +225,8 @@ export function SqlEditorPanel({ tabId }: Props) {
     setPendingInsert(null)
   }, [pendingInsert, activeTabId, tabId, setPendingInsert])
 
-  // Auto-run query when a tab opens with pendingRun: true (e.g., "Select top 100 rows")
-  useEffect(() => {
-    if (tabId !== activeTabId || !tab?.pendingRun) return
-    updateTab(tabId, { pendingRun: false })
-    handleRun()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tabId, activeTabId, tab?.pendingRun])
-
-  if (!tab) return null
-
   const handleRun = async () => {
-    if (!tab.database || !tab.sql.trim()) return
+    if (!tab?.database || !tab?.sql.trim()) return
 
     // Use selected text if there's a non-empty selection, else full SQL
     const editor = editorRef.current
@@ -358,6 +348,14 @@ export function SqlEditorPanel({ tabId }: Props) {
     })
   }
 
+  // Auto-run query when a tab opens with pendingRun: true (e.g., "Select top 100 rows")
+  useEffect(() => {
+    if (tabId !== activeTabId || !tab?.pendingRun) return
+    updateTab(tabId, { pendingRun: false })
+    handleRun()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabId, activeTabId, tab?.pendingRun])
+
   const handleCancel = useCallback(async (queryId: string) => {
     try {
       await api.cancelQuery(queryId)
@@ -426,6 +424,8 @@ export function SqlEditorPanel({ tabId }: Props) {
     if (e.ctrlKey && e.key === 'Enter') handleRun()
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') { e.preventDefault(); handleFormat() }
   }
+
+  if (!tab) return null
 
   const stateColor: Record<string, string> = {
     SUCCEEDED: 'var(--success)',
