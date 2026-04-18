@@ -87,7 +87,34 @@ def test_delete_token():
     assert get_token("user-2") is None
 
 
-# --- overwrite ---
+# --- persistent helpers ---
+
+def test_put_and_get_persistent():
+    from argus.core.session_store import put_persistent, get_persistent
+    put_persistent("cfg:overrides", {"theme": "dark"})
+    assert get_persistent("cfg:overrides") == {"theme": "dark"}
+
+
+def test_get_persistent_missing_returns_none():
+    from argus.core.session_store import get_persistent
+    assert get_persistent("cfg:nonexistent") is None
+
+
+def test_put_persistent_overwrites():
+    from argus.core.session_store import put_persistent, get_persistent
+    put_persistent("cfg:key", {"v": 1})
+    put_persistent("cfg:key", {"v": 2})
+    assert get_persistent("cfg:key") == {"v": 2}
+
+
+def test_persistent_entry_has_long_ttl():
+    import argus.core.session_store as ss
+    import time as real_time
+    from argus.core.session_store import put_persistent
+    put_persistent("cfg:ttl", {"x": 1})
+    entry = ss._memory_store["cfg:ttl"]
+    # Should expire ~10 years from now — at minimum 1 year
+    assert entry["expires_at"] > real_time.time() + 365 * 24 * 3600
 
 def test_overwrite_session():
     from argus.core.session_store import put_session, get_session
