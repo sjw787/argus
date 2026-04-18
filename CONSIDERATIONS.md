@@ -23,6 +23,26 @@ A full test suite covers the core application logic. Tests were written alongsid
 | `test_config.py` | Configuration loading, env-var overrides, and Lambda DynamoDB persistence |
 | `test_api_config.py` | Config API endpoints and workgroup assignment persistence |
 
+→ **224 tests passing across 15 test modules** (after functional test expansion):
+
+| Module | What It Covers |
+|--------|---------------|
+| `test_api_catalog.py` | Glue Data Catalog API endpoints (databases, tables, partitions) |
+| `test_api_queries.py` | Query execution, status polling, results, cancellation |
+| `test_api_workgroups.py` | Workgroup listing, creation, client-workgroup assignment |
+| `test_athena_service.py` | Athena service layer (start, poll, fetch results) |
+| `test_catalog_service.py` | Glue catalog service layer |
+| `test_workgroup_service.py` | Workgroup service (list, get, create, delete) |
+| `test_config.py` | Configuration loading, env-var overrides, and Lambda DynamoDB persistence |
+| `test_api_config.py` | Config API endpoints and workgroup assignment persistence |
+| `test_api_auth.py` | Auth router: status, SSO flow, credential-id session check |
+| `test_export.py` | Export router: CSV/JSON/XLSX, access control |
+| `test_session_store.py` | In-memory and DynamoDB session store backends (100% coverage) |
+| `test_sso_service.py` | SsoService: device-auth flow, polling, accounts/roles, credentials, profiles (100% coverage) |
+| `test_lambda_handler.py` | Lambda Mangum handler: invocation, API Gateway event routing (100% coverage) |
+| `functional/test_query_flow.py` | HTTP-level execute → status → results flow; error cases |
+| `functional/test_export_flow.py` | HTTP-level export access control, CSV/JSON formats, error propagation |
+
 Tests use `pytest` with `unittest.mock` to isolate AWS API calls. No real AWS credentials or network access are required to run the suite.
 
 ```bash
@@ -30,7 +50,7 @@ PYTHONPATH=src python -m pytest tests/ -q
 # 90 passed
 ```
 
-Current line coverage: **51%** (target: 87%). Coverage is enforced by a pre-push ratchet hook — it can only go up between pushes.
+Current line coverage: **58%** (target: 87%). The four most-impactful modules (`sso_service.py`, `session_store.py`, `lambda_handler.py`, `sso_service.py`) now have 100% coverage. Remaining gap is concentrated in the Typer CLI layer (0%) and some router paths tested only through integration. Coverage is enforced by a pre-push ratchet hook — it can only go up between pushes.
 
 ---
 
