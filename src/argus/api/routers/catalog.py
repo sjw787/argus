@@ -252,13 +252,13 @@ def get_information_schema_table(
     if not re.match(r'^[a-zA-Z0-9_]+$', table_name):
         raise HTTPException(status_code=400, detail="Invalid table name")
     try:
-        # table_name is validated above with re.match(r'^[a-zA-Z0-9_]+$')
+        # table_name is validated above with re.match(r'^[a-zA-Z0-9_]+$').
         # Athena does not support parameterized queries; injection is not possible.
-        sql = (  # nosec B608
+        sql = (
             "SELECT column_name, data_type "
             "FROM information_schema.columns "
             "WHERE table_schema = 'information_schema' "
-            f"AND table_name = '{table_name}' "
+            f"AND table_name = '{table_name}' "  # nosec B608
             "ORDER BY ordinal_position"
         )
         exec_resp = athena.start_query_execution(
