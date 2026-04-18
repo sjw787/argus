@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { useEditorStore } from '../../stores/editorStore'
-import { X, Plus } from 'lucide-react'
+import { X, Plus, GitBranch } from 'lucide-react'
 
 export function EditorTabs() {
   const { tabs, activeTabId, addTab, closeTab, setActiveTab, updateTab } = useEditorStore()
@@ -54,10 +54,11 @@ export function EditorTabs() {
             />
           ) : (
             <span
-              className="truncate"
+              className="truncate flex items-center gap-1"
               title="Double-click to rename"
               onDoubleClick={e => { e.stopPropagation(); startEdit(tab.id, tab.title) }}
             >
+              {tab.type === 'er-diagram' && <GitBranch size={10} style={{ flexShrink: 0, opacity: 0.7 }} />}
               {tab.title}
             </span>
           )}

@@ -13,6 +13,7 @@ export interface EditorTab {
   title: string
   sql: string
   database: string
+  type?: 'sql' | 'er-diagram'
   // Single-query (legacy / simple case)
   queryExecutionId?: string
   queryState?: string
@@ -30,6 +31,7 @@ interface EditorStore {
   pendingInsert: string | null
   addTab: (database?: string) => void
   openTab: (opts: { title: string; sql: string; database: string }) => void
+  openErDiagramTab: (database: string) => void
   closeTab: (id: string) => void
   setActiveTab: (id: string) => void
   updateTab: (id: string, updates: Partial<EditorTab>) => void
@@ -65,6 +67,25 @@ export const useEditorStore = create<EditorStore>()(
       openTab: ({ title, sql, database }) => {
         const id = newTabId()
         const newTab: EditorTab = { id, title, sql, database, isLoading: false }
+        set(state => ({ tabs: [...state.tabs, newTab], activeTabId: id }))
+      },
+
+      openErDiagramTab: (database: string) => {
+        // Reuse an existing ER diagram tab for the same database if one is open
+        const existing = get().tabs.find(t => t.type === 'er-diagram' && t.database === database)
+        if (existing) {
+          set({ activeTabId: existing.id })
+          return
+        }
+        const id = newTabId()
+        const newTab: EditorTab = {
+          id,
+          title: `ER: ${database}`,
+          sql: '',
+          database,
+          type: 'er-diagram',
+          isLoading: false,
+        }
         set(state => ({ tabs: [...state.tabs, newTab], activeTabId: id }))
       },
 

@@ -48,8 +48,9 @@ export function DatabaseNavigator() {
   const [showCreateWorkgroup, setShowCreateWorkgroup] = useState(false)
   const addTab = useEditorStore(s => s.addTab)
   const openTab = useEditorStore(s => s.openTab)
+  const openErDiagramTab = useEditorStore(s => s.openErDiagramTab)
   const setPendingInsert = useEditorStore(s => s.setPendingInsert)
-  const { setSelectedDatabase, setSelectedTable, setShowErDiagram } = useUIStore()
+  const { setSelectedDatabase, setSelectedTable } = useUIStore()
   const { showInformationSchema, formatStyle } = useThemeStore()
   const queryClient = useQueryClient()
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -157,7 +158,7 @@ export function DatabaseNavigator() {
     if (!isUnassigned || isDefault) {
       actions.push(
         { label: 'Open new tab', icon: <AlignLeft size={13} />, onClick: () => addTab(db.name) },
-        { label: 'View ER diagram', icon: <GitBranch size={13} />, onClick: () => { setSelectedDatabase(db.name); setShowErDiagram(true) } },
+        { label: 'View ER diagram', icon: <GitBranch size={13} />, onClick: () => openErDiagramTab(db.name) },
         { separator: true, label: '', onClick: () => {} },
         { label: 'Insert name at cursor', icon: <MousePointerClick size={13} />, onClick: () => setPendingInsert(`"${db.name}"`) },
         { label: 'Copy name', icon: <ClipboardCopy size={13} />, onClick: () => navigator.clipboard.writeText(db.name) },
@@ -264,7 +265,7 @@ export function DatabaseNavigator() {
             onToggle={() => toggleWorkgroup(workgroup)}
             onToggleDb={toggleDb}
             onToggleTable={toggleTable}
-            onShowEr={(dbName) => { setSelectedDatabase(dbName); setShowErDiagram(true) }}
+            onShowEr={(dbName) => openErDiagramTab(dbName)}
             onSelectTable={setSelectedTable}
             onDbMenu={openDbMenu}
             onTableMenu={openTableMenu}
