@@ -182,6 +182,11 @@ export function SqlEditorPanel({ tabId }: Props) {
     editorRef.current = editor
     if (monaco && sqlDiagnostics) registerSqlDiagnostics(monaco, editor)
 
+    // Expose the editor instance for E2E tests (MSW dev/test mode only).
+    if (import.meta.env.VITE_ENABLE_MSW === 'true') {
+      ;(window as unknown as Record<string, unknown>).__argus_editor = editor
+    }
+
     // Belt-and-suspenders: explicitly bind Space (with no modifiers) to
     // 'type a space' inside the editor, overriding any keybinding context
     // (suggestWidgetVisible, inlineSuggestionVisible, hasSnippet, etc.) that

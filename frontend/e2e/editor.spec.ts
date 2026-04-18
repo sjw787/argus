@@ -1,84 +1,200 @@
 import { test, expect, Page } from '@playwright/test'
 
-// Locate the Monaco editor's accessible textbox (native-edit-context API)
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/** Locate the Monaco editor's accessible textbox (native-edit-context API). */
 function editorTextbox(page: Page) {
   return page.getByRole('textbox', { name: /editor content/i })
 }
 
-// Wait for the editor to be ready
+/** Wait for the editor to be ready and for __argus_editor to be populated. */
 async function waitForEditor(page: Page) {
   await editorTextbox(page).waitFor({ state: 'visible', timeout: 30_000 })
+  // Wait for the test handle to be set by handleEditorMount
+  await page.waitForFunction(() => !!(window as unknown as Record<string, unknown>).__argus_editor, { timeout: 10_000 })
 }
 
-// Focus the editor and set content (select all, then type)
-async function setEditorContent(page: Page, content: string) {
-  const tb = editorTextbox(page)
-  // Monaco's view-line divs intercept pointer events; force the click to bypass
-  await tb.click({ force: true })
-  await page.keyboard.press('ControlOrMeta+A')
-  await page.keyboard.type(content)
+/**
+ * Read the current editor content via Monaco's model API.
+ * This is the authoritative source of truth — avoids DOM scraping of
+ * .view-line elements, which suffers from virtual rendering, non-breaking
+ * space normalization, and missing off-screen lines.
+ */
+async function getEditorValue(page: Page): Promise<string> {
+  return page.evaluate(
+    () =>
+      (
+        window as unknown as {
+          __argus_editor?: { getValue(): string }
+        }
+      ).__argus_editor?.getValue() ?? ''
+  )
 }
+
+/**
+ * Set editor content via Monaco's model API, bypassing keyboard simulation.
+ * This guarantees a clean, known starting state for each test regardless of
+ * autocomplete, snippet state, or prior content.
+ */
+async function setEditorContent(page: Page, content: string) {
+  await page.evaluate(
+    (text) =>
+      (
+        window as unknown as {
+          __argus_editor?: { setValue(v: string): void; focus(): void }
+        }
+      ).__argus_editor?.setValue(text),
+    content
+  )
+  // Focus the editor so keyboard events land in the right target
+  const tb = editorTextbox(page)
+  await tb.click({ force: true })
+}
+
+/** Move the cursor to end of content so subsequent keystrokes append. */
+async function moveCursorToEnd(page: Page) {
+  await page.keyboard.press('ControlOrMeta+End')
+}
+
+
+async function triggerSuggest(page: Page) {
+  await page.evaluate(() =>
+    (
+      window as unknown as {
+        __argus_editor?: { trigger(s: string, h: string, p: unknown): void }
+      }
+    ).__argus_editor?.trigger('keyboard', 'editor.action.triggerSuggest', {})
+  )
+}
+
+// ── Setup ─────────────────────────────────────────────────────────────────────
 
 test.beforeEach(async ({ page }) => {
-  // Clear persisted Zustand editor state (localStorage) so each test starts
-  // with a single empty tab regardless of what previous tests left behind.
-  await page.addInitScript(() => {
-    localStorage.clear()
-  })
+  await page.addInitScript(() => { localStorage.clear() })
   await page.goto('/')
   await waitForEditor(page)
 })
 
-test('spacebar in line comment does not open autocomplete', async ({ page }) => {
-  await setEditorContent(page, '-- this is a comment')
+// ── Spacebar tests ────────────────────────────────────────────────────────────
 
-  // Dismiss any autocomplete that may have opened while typing
-  await page.keyboard.press('Escape')
-
+test('space inserts literal space in an empty editor', async ({ page }) => {
+  await setEditorContent(page, '')
+  await moveCursorToEnd(page)
   await page.keyboard.press('Space')
 
-  // Suggest widget must not be visible after typing a space in a comment
-  const suggest = page.locator('.suggest-widget')
-  await expect(suggest).not.toBeVisible({ timeout: 2_000 })
+  const value = await getEditorValue(page)
+  expect(value).toBe(' ')
 })
 
-test('spacebar in block comment does not open autocomplete', async ({ page }) => {
-  await setEditorContent(page, '/* block comment')
+test('space inserts literal space after a complete SQL keyword (SELECT)', async ({ page }) => {
+  // This is the primary regression: typing "SELECT" opens the suggest widget;
+  // space must insert a space, NOT collapse the keyword or accept a suggestion.
+  await setEditorContent(page, 'SELECT')
+  await moveCursorToEnd(page)
 
-  await page.keyboard.press('Escape')
-  await page.keyboard.press('Space')
-
-  const suggest = page.locator('.suggest-widget')
-  await expect(suggest).not.toBeVisible({ timeout: 2_000 })
-})
-
-test('spacebar always inserts a literal space, even when suggest widget is open', async ({ page }) => {
-  // Regression: Monaco's default `acceptSuggestionOnCommitCharacter: true` made
-  // space accept the highlighted SQL keyword instead of inserting a space, so
-  // typing "SEL " produced "SELECT" or "SEL<keyword>" instead of "SEL ".
-  await setEditorContent(page, 'SEL')
-
-  // Wait for the suggest widget to appear so we exercise the commit-character path
+  // setValue() is programmatic so suggest doesn't auto-open — trigger it explicitly
+  await triggerSuggest(page)
   const suggest = page.locator('.suggest-widget')
   await expect(suggest).toBeVisible({ timeout: 8_000 })
 
-  // Now press space — it must insert a literal space, NOT accept the highlighted suggestion
+  await page.keyboard.press('Space')
+
+  const value = await getEditorValue(page)
+  // Must be exactly "SELECT " — no extra characters from an accepted suggestion
+  expect(value).toBe('SELECT ')
+  await expect(suggest).not.toBeVisible({ timeout: 1_500 })
+})
+
+test('space inserts literal space mid-token (SEL → SEL FROM)', async ({ page }) => {
+  // Original regression: "SEL " produced "SELECT" or "SEL<keyword>" instead of "SEL ".
+  await setEditorContent(page, 'SEL')
+  await moveCursorToEnd(page)
+
+  // setValue() is programmatic so suggest doesn't auto-open — trigger it explicitly
+  await triggerSuggest(page)
+  const suggest = page.locator('.suggest-widget')
+  await expect(suggest).toBeVisible({ timeout: 8_000 })
+
   await page.keyboard.press('Space')
   await page.keyboard.type('FROM')
 
-  // Read the editor's full text via DOM (concatenate all .view-line spans).
-  // Use evaluate so we can wait for Monaco to render after the keystrokes.
-  const editorValue = await page.evaluate(() => {
-    const lines = Array.from(document.querySelectorAll('.view-line'))
-    // Monaco renders spaces as non-breaking spaces (U+00A0) for layout; normalize.
-    return lines.map(l => (l as HTMLElement).innerText.replace(/\u00A0/g, ' ')).join('\n').trim()
-  })
-  expect(editorValue).toContain('SEL FROM')
-  expect(editorValue).not.toMatch(/SELECTFROM|SELECT FROM/)
+  const value = await getEditorValue(page)
+  expect(value).toContain('SEL FROM')
+  expect(value).not.toMatch(/SELECTFROM|SELECT FROM/)
 })
+
+test('multiple consecutive spaces all insert as literal spaces', async ({ page }) => {
+  await setEditorContent(page, 'A')
+  await moveCursorToEnd(page)
+
+  await page.keyboard.press('Space')
+  await page.keyboard.press('Space')
+  await page.keyboard.press('Space')
+
+  const value = await getEditorValue(page)
+  expect(value).toBe('A   ')
+})
+
+test('space inserts correctly with no suggest widget open', async ({ page }) => {
+  // "ZZZZ" triggers no SQL completions; space must still just insert a space.
+  await setEditorContent(page, 'ZZZZ')
+  await moveCursorToEnd(page)
+
+  const suggest = page.locator('.suggest-widget')
+  await expect(suggest).not.toBeVisible({ timeout: 2_000 })
+
+  await page.keyboard.press('Space')
+
+  const value = await getEditorValue(page)
+  expect(value).toBe('ZZZZ ')
+})
+
+test('space inserts correctly at the start of a new line', async ({ page }) => {
+  // Set a single-line query, then press Enter to open a new line, then Space.
+  // Pressing Enter (not setValue with '\n') ensures the cursor is correctly
+  // positioned on the new empty line before the Space keystroke.
+  await setEditorContent(page, 'SELECT *')
+  await moveCursorToEnd(page)
+  await page.keyboard.press('Enter')
+  await page.keyboard.press('Space')
+
+  const value = await getEditorValue(page)
+  // The second line must start with a space (indentation / alignment use case)
+  const lines = value.split('\n')
+  expect(lines.length).toBeGreaterThanOrEqual(2)
+  expect(lines[1]).toMatch(/^\s/)
+})
+
+test('space in line comment inserts literal space and does not open autocomplete', async ({ page }) => {
+  await setEditorContent(page, '-- comment')
+  await moveCursorToEnd(page)
+  await page.keyboard.press('Space')
+
+  const value = await getEditorValue(page)
+  expect(value).toBe('-- comment ')
+
+  const suggest = page.locator('.suggest-widget')
+  await expect(suggest).not.toBeVisible({ timeout: 1_500 })
+})
+
+test('space in block comment inserts literal space and does not open autocomplete', async ({ page }) => {
+  await setEditorContent(page, '/* block comment')
+  await moveCursorToEnd(page)
+  await page.keyboard.press('Space')
+
+  const value = await getEditorValue(page)
+  expect(value).toBe('/* block comment ')
+
+  const suggest = page.locator('.suggest-widget')
+  await expect(suggest).not.toBeVisible({ timeout: 1_500 })
+})
+
+// ── Other editor tests ────────────────────────────────────────────────────────
 
 test('autocomplete appears for SQL keywords', async ({ page }) => {
   await setEditorContent(page, 'SEL')
+  await moveCursorToEnd(page)
+  await triggerSuggest(page)
 
   const suggest = page.locator('.suggest-widget')
   await expect(suggest).toBeVisible({ timeout: 8_000 })
@@ -86,8 +202,6 @@ test('autocomplete appears for SQL keywords', async ({ page }) => {
 })
 
 test('Format button reformats SQL', async ({ page }) => {
-  // Use a multi-column query so the formatted output has 10+ lines,
-  // guaranteeing it exceeds Monaco's pre-rendered phantom line count (~8).
   const rawSql = 'select id,name,email,status,role,created_at from users where status=\'active\' and role=\'admin\' order by created_at desc'
   await setEditorContent(page, rawSql)
 
@@ -103,23 +217,17 @@ test('Format button reformats SQL', async ({ page }) => {
 })
 
 test('export buttons visible when allow_download is true', async ({ page }) => {
-  // With React StrictMode the store may contain 2 tabs; the inactive tab's
-  // elements are inside display:none. Use :visible to find only the rendered one.
   await page.locator('button:visible').filter({ hasText: /select database/i }).click()
-  // Wait for the dropdown's search input to appear
   await page.waitForSelector('input[placeholder*="Search"]', { timeout: 5_000 })
-  // Wait for test_db to load from the mocked API
   await page.waitForSelector('text=test_db', { timeout: 5_000 })
   await page.getByText('test_db').click()
-  // Confirm picker now shows the selected database
   await expect(page.locator('button:visible').filter({ hasText: /test_db/ })).toBeVisible({ timeout: 3_000 })
 
   await setEditorContent(page, 'SELECT 1')
 
-  // Run button should now be enabled (database + SQL set)
   await page.locator('button:visible').filter({ hasText: /^run$/i }).click()
 
-  // MSW returns SUCCEEDED immediately so export buttons appear quickly
   await expect(page.locator('button', { hasText: 'CSV' })).toBeVisible({ timeout: 10_000 })
   await expect(page.locator('button', { hasText: 'JSON' })).toBeVisible()
 })
+
