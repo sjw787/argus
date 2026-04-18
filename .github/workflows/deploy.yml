@@ -174,8 +174,17 @@ jobs:
           fi
           cd infra
           terraform init
+          # Helper: check whether a resource address is present in TF state.
+          # Captures the full state list to a variable before grepping so that
+          # grep -q never closes the read-end of a pipe while Terraform is still
+          # writing, causing a broken-pipe (EPIPE) in the setup-terraform wrapper.
+          tf_in_state() {
+            local _out
+            _out=$(terraform state list 2>/dev/null) || true
+            echo "$_out" | grep -q "$1"
+          }
           # Import pre-existing ECR repo only if not already in state
-          if ! terraform state list | grep -q 'aws_ecr_repository.app'; then
+          if ! tf_in_state 'aws_ecr_repository.app'; then
             echo "ECR repo not in state, importing..."
             terraform import \
               -var="environment=${ENVIRONMENT}" \
@@ -185,13 +194,12 @@ jobs:
             echo "ECR repo already in state, skipping import"
           fi
           # Remove corrupted ECR repo policy from state so TF can recreate it cleanly
-          if terraform state list | grep -q 'aws_ecr_repository_policy.app'; then
+          if tf_in_state 'aws_ecr_repository_policy.app'; then
             echo "Removing ECR repo policy from state for clean recreation..."
             terraform state rm aws_ecr_repository_policy.app || true
           fi
           # Import orphan CloudFront distribution if one exists with our CNAME and isn't in state
-          CF_IN_STATE=$(terraform state list | grep 'aws_cloudfront_distribution.app' || true)
-          if [ -z "$CF_IN_STATE" ]; then
+          if ! tf_in_state 'aws_cloudfront_distribution.app'; then
             ORPHAN_CF=$(aws cloudfront list-distributions \
               --query "DistributionList.Items[?Aliases.Items[?contains(@,'argus.samwylock.com')]].Id" \
               --output text 2>/dev/null || true)
@@ -207,14 +215,14 @@ jobs:
           HZ_ID=$(aws route53 list-hosted-zones-by-name --dns-name "argus.samwylock.com" \
             --query "HostedZones[?Name=='argus.samwylock.com.'].Id" --output text | sed 's|/hostedzone/||' || true)
           if [ -n "$HZ_ID" ]; then
-            if ! terraform state list | grep -q 'aws_route53_record.app_a'; then
+            if ! tf_in_state 'aws_route53_record.app_a'; then
               echo "Importing Route53 A record..."
               terraform import \
                 -var="environment=${ENVIRONMENT}" \
                 -var="image_uri=${IMAGE_URI}" \
                 aws_route53_record.app_a "${HZ_ID}_argus.samwylock.com_A" || true
             fi
-            if ! terraform state list | grep -q 'aws_route53_record.app_aaaa'; then
+            if ! tf_in_state 'aws_route53_record.app_aaaa'; then
               echo "Importing Route53 AAAA record..."
               terraform import \
                 -var="environment=${ENVIRONMENT}" \
@@ -223,7 +231,7 @@ jobs:
             fi
           fi
           # Import primary Athena workgroup (always exists; we manage its OutputLocation)
-          if ! terraform state list | grep -q 'aws_athena_workgroup.primary'; then
+          if ! tf_in_state 'aws_athena_workgroup.primary'; then
             echo "Importing primary Athena workgroup..."
             terraform import \
               -var="environment=${ENVIRONMENT}" \
@@ -242,15 +250,15 @@ jobs:
               done)
               TF_IMPORT_OPTS="-var=environment=${ENVIRONMENT} -var=image_uri=${IMAGE_URI}"
               if [ -n "$PS_ARN" ]; then
-                if ! terraform state list | grep -q 'aws_ssoadmin_permission_set.athena_access'; then
+                if ! tf_in_state 'aws_ssoadmin_permission_set.athena_access'; then
                   echo "Importing permission set $PS_ARN..."
                   terraform import $TF_IMPORT_OPTS 'aws_ssoadmin_permission_set.athena_access[0]' "${PS_ARN},${SSO_INSTANCE_ARN}" || true
                 fi
-                if ! terraform state list | grep -q 'aws_ssoadmin_managed_policy_attachment.athena_full'; then
+                if ! tf_in_state 'aws_ssoadmin_managed_policy_attachment.athena_full'; then
                   echo "Importing Athena managed policy attachment..."
                   terraform import $TF_IMPORT_OPTS 'aws_ssoadmin_managed_policy_attachment.athena_full[0]' "arn:aws:iam::aws:policy/AmazonAthenaFullAccess,${PS_ARN},${SSO_INSTANCE_ARN}" || true
                 fi
-                if ! terraform state list | grep -q 'aws_ssoadmin_managed_policy_attachment.glue_readonly'; then
+                if ! tf_in_state 'aws_ssoadmin_managed_policy_attachment.glue_readonly'; then
                   echo "Importing Glue managed policy attachment..."
                   terraform import $TF_IMPORT_OPTS 'aws_ssoadmin_managed_policy_attachment.glue_readonly[0]' "arn:aws:iam::aws:policy/AWSGlueConsoleFullAccess,${PS_ARN},${SSO_INSTANCE_ARN}" || true
                 fi
@@ -258,11 +266,11 @@ jobs:
               if [ -n "$IDENTITY_STORE_ID" ] && [ "$IDENTITY_STORE_ID" != "None" ]; then
                 GROUP_ID=$(aws identitystore list-groups --identity-store-id "$IDENTITY_STORE_ID" --region "${AWS_REGION}" --query "Groups[?DisplayName=='ArgusUsers'].GroupId | [0]" --output text 2>/dev/null || true)
                 if [ -n "$GROUP_ID" ] && [ "$GROUP_ID" != "None" ]; then
-                  if ! terraform state list | grep -q 'aws_identitystore_group.argus_users'; then
+                  if ! tf_in_state 'aws_identitystore_group.argus_users'; then
                     echo "Importing identity store group $GROUP_ID..."
                     terraform import $TF_IMPORT_OPTS 'aws_identitystore_group.argus_users[0]' "${IDENTITY_STORE_ID}/${GROUP_ID}" || true
                   fi
-                  if [ -n "$PS_ARN" ] && ! terraform state list | grep -q 'aws_ssoadmin_account_assignment.argus_users'; then
+                  if [ -n "$PS_ARN" ] && ! tf_in_state 'aws_ssoadmin_account_assignment.argus_users'; then
                     echo "Importing account assignment..."
                     terraform import $TF_IMPORT_OPTS 'aws_ssoadmin_account_assignment.argus_users[0]' "${GROUP_ID},GROUP,${AWS_ACCOUNT_ID},AWS_ACCOUNT,${PS_ARN},${SSO_INSTANCE_ARN}" || true
                   fi
