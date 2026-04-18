@@ -10,6 +10,8 @@ from typing import Optional
 
 import boto3
 
+from argus.services.aws_endpoints import get_endpoint_url
+
 
 # ── Data classes ──────────────────────────────────────────────────────────────
 
@@ -63,8 +65,14 @@ class SsoService:
 
     def __init__(self, region: str) -> None:
         self.region = region
-        self._oidc = boto3.client("sso-oidc", region_name=region)
-        self._sso = boto3.client("sso", region_name=region)
+        self._oidc = boto3.client(
+            "sso-oidc", region_name=region,
+            endpoint_url=get_endpoint_url("sso-oidc", region),
+        )
+        self._sso = boto3.client(
+            "sso", region_name=region,
+            endpoint_url=get_endpoint_url("sso", region),
+        )
 
     # ── Step 1: register + start device auth ──────────────────────────────────
 

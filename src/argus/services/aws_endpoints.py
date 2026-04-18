@@ -4,10 +4,13 @@ import os
 # Maps boto3 service names to their FIPS endpoint host templates.
 # FIPS endpoints are available in both commercial and GovCloud regions.
 _FIPS_HOSTS: dict[str, str] = {
-    "athena": "athena-fips.{region}.amazonaws.com",
-    "glue":   "glue-fips.{region}.amazonaws.com",
-    "s3":     "s3-fips.{region}.amazonaws.com",
-    "sts":    "sts-fips.{region}.amazonaws.com",
+    "athena":    "athena-fips.{region}.amazonaws.com",
+    "glue":      "glue-fips.{region}.amazonaws.com",
+    "s3":        "s3-fips.{region}.amazonaws.com",
+    "sts":       "sts-fips.{region}.amazonaws.com",
+    "logs":      "logs-fips.{region}.amazonaws.com",
+    "sso":       "portal.sso-fips.{region}.amazonaws.com",
+    "sso-oidc":  "oidc-fips.{region}.amazonaws.com",
 }
 
 

@@ -47,10 +47,13 @@ class TestGetEndpointUrl:
         assert m.get_endpoint_url("sagemaker", "us-east-1") is None
 
     @pytest.mark.parametrize("service,expected_host", [
-        ("athena", "athena-fips.us-east-1.amazonaws.com"),
-        ("glue",   "glue-fips.us-east-1.amazonaws.com"),
-        ("s3",     "s3-fips.us-east-1.amazonaws.com"),
-        ("sts",    "sts-fips.us-east-1.amazonaws.com"),
+        ("athena",   "athena-fips.us-east-1.amazonaws.com"),
+        ("glue",     "glue-fips.us-east-1.amazonaws.com"),
+        ("s3",       "s3-fips.us-east-1.amazonaws.com"),
+        ("sts",      "sts-fips.us-east-1.amazonaws.com"),
+        ("logs",     "logs-fips.us-east-1.amazonaws.com"),
+        ("sso",      "portal.sso-fips.us-east-1.amazonaws.com"),
+        ("sso-oidc", "oidc-fips.us-east-1.amazonaws.com"),
     ])
     def test_fips_endpoints_for_known_services(self, monkeypatch, service, expected_host):
         monkeypatch.setenv("ARGUS_USE_FIPS_ENDPOINTS", "true")
@@ -67,7 +70,7 @@ class TestGetEndpointUrl:
     def test_url_is_https(self, monkeypatch):
         monkeypatch.setenv("ARGUS_USE_FIPS_ENDPOINTS", "true")
         m = _reload_module()
-        for svc in ("athena", "glue", "s3", "sts"):
+        for svc in ("athena", "glue", "s3", "sts", "logs", "sso", "sso-oidc"):
             url = m.get_endpoint_url(svc, "us-east-1")
             assert url is not None
             assert url.startswith("https://")

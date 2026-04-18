@@ -229,3 +229,71 @@ class TestAuditMiddleware:
             _mw_module.audit_logger._enabled = original_enabled
 
         assert response.status_code in (200, 401, 403, 422)
+
+
+# ── Threading / sequence-token safety tests ───────────────────────────────────
+
+class TestAuditLoggerThreadSafety:
+    def test_lock_exists_on_logger_instance(self, monkeypatch):
+        import threading
+        monkeypatch.delenv("ARGUS_AUDIT_LOGGING", raising=False)
+        m = _reload_audit_logger()
+        logger = m.AuditLogger()
+        assert hasattr(logger, "_lock")
+        assert isinstance(logger._lock, type(threading.Lock()))
+
+    def test_emit_to_cloudwatch_uses_lock(self, monkeypatch):
+        """Verify _emit_to_cloudwatch runs under the instance lock (calls put_log_events)."""
+        monkeypatch.setenv("ARGUS_AUDIT_LOGGING", "true")
+        monkeypatch.setenv("ARGUS_AUDIT_LOG_GROUP", "/argus/audit")
+        monkeypatch.setenv("ARGUS_REGION", "us-east-1")
+        m = _reload_audit_logger()
+
+        mock_cw = MagicMock()
+        mock_cw.put_log_events.return_value = {"nextSequenceToken": "tok1"}
+
+        logger = m.AuditLogger()
+        logger._cw_client = mock_cw
+        logger._stream_name = "test-stream"
+
+        logger._emit_to_cloudwatch("test message")
+
+        mock_cw.put_log_events.assert_called_once()
+        call_kwargs = mock_cw.put_log_events.call_args[1]
+        assert call_kwargs["logGroupName"] == "/argus/audit"
+        assert call_kwargs["logStreamName"] == "test-stream"
+        assert logger._sequence_token == "tok1"
+
+
+class TestAuditLoggerFipsCloudWatch:
+    def test_cloudwatch_client_uses_fips_endpoint_when_enabled(self, monkeypatch):
+        monkeypatch.setenv("ARGUS_AUDIT_LOGGING", "true")
+        monkeypatch.setenv("ARGUS_AUDIT_LOG_GROUP", "/argus/audit")
+        monkeypatch.setenv("ARGUS_REGION", "us-east-1")
+        monkeypatch.setenv("ARGUS_USE_FIPS_ENDPOINTS", "true")
+        m = _reload_audit_logger()
+
+        with patch("boto3.client") as mock_boto:
+            mock_cw = MagicMock()
+            mock_boto.return_value = mock_cw
+            m.AuditLogger()
+
+        call_kwargs = mock_boto.call_args
+        assert call_kwargs is not None
+        assert call_kwargs[1].get("endpoint_url") == "https://logs-fips.us-east-1.amazonaws.com"
+
+    def test_cloudwatch_client_no_fips_endpoint_when_disabled(self, monkeypatch):
+        monkeypatch.setenv("ARGUS_AUDIT_LOGGING", "true")
+        monkeypatch.setenv("ARGUS_AUDIT_LOG_GROUP", "/argus/audit")
+        monkeypatch.setenv("ARGUS_REGION", "us-east-1")
+        monkeypatch.delenv("ARGUS_USE_FIPS_ENDPOINTS", raising=False)
+        m = _reload_audit_logger()
+
+        with patch("boto3.client") as mock_boto:
+            mock_cw = MagicMock()
+            mock_boto.return_value = mock_cw
+            m.AuditLogger()
+
+        call_kwargs = mock_boto.call_args
+        assert call_kwargs is not None
+        assert call_kwargs[1].get("endpoint_url") is None

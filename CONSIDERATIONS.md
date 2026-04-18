@@ -10,7 +10,7 @@ The premise: *AI can write the code, but a human still has to own the outcome.* 
 
 A full test suite covers the core application logic. Tests were written alongside the code and validated against the real application behaviour.
 
-**264 tests passing across 17 test modules:**
+**271 tests passing across 17 test modules:**
 
 | Module | What It Covers |
 |--------|---------------|
@@ -36,7 +36,7 @@ Tests use `pytest` with `unittest.mock` to isolate AWS API calls. No real AWS cr
 
 ```bash
 PYTHONPATH=src python -m pytest tests/ -q
-# 264 passed
+# 271 passed
 ```
 
 Current line coverage: **59%** (target: 87%). Key service modules (`sso_service.py`, `session_store.py`, `lambda_handler.py`, `aws_endpoints.py`) are now at 100% coverage. Remaining gap is concentrated in the Typer CLI layer (0%) and some router dependency paths. Coverage is enforced by a pre-push ratchet hook — it can only go up between pushes.
@@ -83,6 +83,17 @@ A dedicated privacy audit was run to verify that customer Athena data is never c
 - ✅ DynamoDB session store holds auth artifacts only (tokens, temp credentials), never query data
 
 See [PRIVACY.md](PRIVACY.md) for the full data disclosure.
+
+### Review 4 — FedRAMP Compliance Components (April 2026)
+
+Code review of the FedRAMP audit logging, FIPS endpoint, and GovCloud changes. Three real issues found and fixed:
+
+- 🟠 **CloudWatch Logs client bypassed FIPS endpoints** (`audit_logger.py:82`): `AuditLogger._init_cloudwatch()` created the boto3 `"logs"` client without an `endpoint_url`, even when `ARGUS_USE_FIPS_ENDPOINTS=true`. Fixed: added `"logs"` to `_FIPS_HOSTS` in `aws_endpoints.py` and wired `get_endpoint_url("logs", region)` into the CloudWatch client constructor. ✅ Resolved.
+- 🟠 **SSO/OIDC clients bypassed FIPS endpoints** (`sso_service.py:66-67`): Both `sso-oidc` and `sso` boto3 clients were created without FIPS endpoints, missing from `_FIPS_HOSTS`. Fixed: added both services to `_FIPS_HOSTS` and wired `get_endpoint_url()` into `SsoService.__init__()`. ✅ Resolved.
+- 🟠 **CloudWatch sequence token race condition** (`audit_logger.py:141-156`): `self._sequence_token` is mutable shared state on a module-level singleton; concurrent Lambda invocations sharing the same execution environment could collide on `put_log_events`. Fixed: added `self._lock = threading.Lock()` and wrapped the read-modify-write in `with self._lock:`. ✅ Resolved.
+- 🔵 **Misleading comment in audit middleware** (`middleware.py:32-33`): Comment claimed `request.state.user_identity` is "populated by `get_current_user()`" — it never is. Fixed: updated comment to accurately describe the `X-Credential-Id` header fallback. ✅ Resolved.
+
+7 new tests added covering: FIPS endpoint for `logs`, `sso`, `sso-oidc` services; CloudWatch client `endpoint_url` injection; `threading.Lock` presence; `_emit_to_cloudwatch` sequence token update.
 
 ---
 

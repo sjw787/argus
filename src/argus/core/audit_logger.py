@@ -2,6 +2,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import threading
 import time
 import uuid
 from typing import Optional
@@ -65,6 +66,7 @@ class AuditLogger:
         self._stream_name: Optional[str] = None
         self._sequence_token: Optional[str] = None
         self._cw_client = None
+        self._lock = threading.Lock()
 
         if self._enabled:
             self._init_cloudwatch()
@@ -78,8 +80,12 @@ class AuditLogger:
             return
         try:
             import boto3
+            from argus.services.aws_endpoints import get_endpoint_url
             region = os.environ.get("ARGUS_REGION", "us-east-1")
-            self._cw_client = boto3.client("logs", region_name=region)
+            endpoint_url = get_endpoint_url("logs", region)
+            self._cw_client = boto3.client(
+                "logs", region_name=region, endpoint_url=endpoint_url
+            )
             self._stream_name = f"argus-{uuid.uuid4().hex[:8]}"
             self._cw_client.create_log_stream(
                 logGroupName=self._log_group,
@@ -140,17 +146,18 @@ class AuditLogger:
 
     def _emit_to_cloudwatch(self, message: str) -> None:
         try:
-            kwargs: dict = {
-                "logGroupName": self._log_group,
-                "logStreamName": self._stream_name,
-                "logEvents": [
-                    {"timestamp": int(time.time() * 1000), "message": message}
-                ],
-            }
-            if self._sequence_token:
-                kwargs["sequenceToken"] = self._sequence_token
-            response = self._cw_client.put_log_events(**kwargs)
-            self._sequence_token = response.get("nextSequenceToken")
+            with self._lock:
+                kwargs: dict = {
+                    "logGroupName": self._log_group,
+                    "logStreamName": self._stream_name,
+                    "logEvents": [
+                        {"timestamp": int(time.time() * 1000), "message": message}
+                    ],
+                }
+                if self._sequence_token:
+                    kwargs["sequenceToken"] = self._sequence_token
+                response = self._cw_client.put_log_events(**kwargs)
+                self._sequence_token = response.get("nextSequenceToken")
         except Exception as exc:  # pragma: no cover
             log.error("Failed to write audit event to CloudWatch: %s", exc)
 

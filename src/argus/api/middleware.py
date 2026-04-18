@@ -29,8 +29,8 @@ class AuditMiddleware(BaseHTTPMiddleware):
         response = await call_next(request)
         duration_ms = (time.monotonic() - start) * 1000
 
-        # Extract user identity — populated by get_current_user() dependency.
-        # Falls back to the credential-id header if the dependency hasn't run yet.
+        # Extract user identity from the SSO credential-id header (Lambda mode)
+        # or fall back to "anonymous" for unauthenticated requests.
         user = (
             getattr(request.state, "user_identity", None)
             or request.headers.get("x-credential-id", "anonymous")
