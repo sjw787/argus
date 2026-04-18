@@ -106,7 +106,18 @@ export function BottomPanel({ onToggle }: { onToggle?: () => void }) {
 
   return (
     <div className="flex flex-col h-full" style={{ background: 'var(--bg-panel)', borderTop: '1px solid var(--border)' }}>
-      <div className="flex items-center gap-0 px-2 shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
+      <div
+        className="flex items-center gap-0 px-2 shrink-0"
+        style={{ borderBottom: '1px solid var(--border)', cursor: 'default' }}
+        onDoubleClick={(e) => {
+          // Double-click the tab bar to collapse, but ignore double-clicks
+          // that land on the chevron (close) button — it already toggles on
+          // single click and firing again would reopen the panel.
+          const target = e.target as HTMLElement
+          if (target.closest('button[title="Hide panel"]')) return
+          onToggle?.()
+        }}
+      >
         {tabDefs.map(tab => (
           <button
             key={tab.id}
