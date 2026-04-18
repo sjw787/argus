@@ -5,7 +5,16 @@ from fastapi.testclient import TestClient
 
 from argus.api.app import create_app
 from argus.api.dependencies import get_catalog_service, get_config
-from argus.models.schemas import AppConfig
+from argus.api.routers.catalog import _db_cache
+from argus.models.schemas import AppConfig, NamingSchema, WorkgroupConfig
+
+
+@pytest.fixture(autouse=True)
+def clear_db_cache():
+    """Flush the module-level database list cache before every catalog test."""
+    _db_cache.invalidate_all()
+    yield
+    _db_cache.invalidate_all()
 
 
 @pytest.fixture
@@ -29,6 +38,103 @@ def test_list_databases(client, mock_catalog_svc):
     assert resp.status_code == 200
     assert resp.json()["items"][0]["name"] == "mydb"
 
+
+# ---------------------------------------------------------------------------
+# Workgroup annotation in list_databases
+# ---------------------------------------------------------------------------
+
+def test_list_databases_shows_assigned_workgroup(mock_catalog_svc):
+    """Databases with an explicit assignment should have their workgroup returned."""
+    config = AppConfig(
+        naming_schemas={
+            "default": NamingSchema(
+                pattern="{client_id}_prod",
+                client_id_regex=r"[a-z0-9]+",
+                workgroup_pattern="{client_id}-wg",
+            )
+        },
+        active_schema="default",
+        workgroups=WorkgroupConfig(assignments={"acme_prod": "acme-wg"}),
+    )
+    app = create_app()
+    app.dependency_overrides[get_config] = lambda: config
+    app.dependency_overrides[get_catalog_service] = lambda: mock_catalog_svc
+    mock_catalog_svc.list_databases.return_value = {
+        "DatabaseList": [{"Name": "acme_prod"}]
+    }
+    with TestClient(app) as c:
+        resp = c.get("/api/v1/catalog/databases")
+    assert resp.status_code == 200
+    assert resp.json()["items"][0]["workgroup"] == "acme-wg"
+
+
+def test_list_databases_unassigned_workgroup_is_none(mock_catalog_svc):
+    """Databases not in the assignment map should have workgroup=None."""
+    config = AppConfig(
+        naming_schemas={
+            "default": NamingSchema(
+                pattern="{client_id}_prod",
+                client_id_regex=r"[a-z0-9]+",
+                workgroup_pattern="{client_id}-wg",
+            )
+        },
+        active_schema="default",
+        workgroups=WorkgroupConfig(assignments={}),  # no assignments
+    )
+    app = create_app()
+    app.dependency_overrides[get_config] = lambda: config
+    app.dependency_overrides[get_catalog_service] = lambda: mock_catalog_svc
+    mock_catalog_svc.list_databases.return_value = {
+        "DatabaseList": [{"Name": "other_prod"}]
+    }
+    with TestClient(app) as c:
+        resp = c.get("/api/v1/catalog/databases")
+    assert resp.status_code == 200
+    assert resp.json()["items"][0]["workgroup"] is None
+
+
+def test_list_databases_no_schema_workgroup_is_none(mock_catalog_svc):
+    """With no naming schema configured, the workgroup field should be None."""
+    config = AppConfig()  # no schemas, no assignments
+    app = create_app()
+    app.dependency_overrides[get_config] = lambda: config
+    app.dependency_overrides[get_catalog_service] = lambda: mock_catalog_svc
+    mock_catalog_svc.list_databases.return_value = {
+        "DatabaseList": [{"Name": "mydb"}]
+    }
+    with TestClient(app) as c:
+        resp = c.get("/api/v1/catalog/databases")
+    assert resp.status_code == 200
+    assert resp.json()["items"][0]["workgroup"] is None
+
+
+def test_list_databases_multiple_mixed_assignments(mock_catalog_svc):
+    """Only assigned databases carry a workgroup; unassigned ones stay None."""
+    config = AppConfig(
+        naming_schemas={
+            "default": NamingSchema(
+                pattern="{client_id}_prod",
+                client_id_regex=r"[a-z0-9]+",
+                workgroup_pattern="{client_id}-wg",
+            )
+        },
+        active_schema="default",
+        workgroups=WorkgroupConfig(assignments={"assigned_prod": "assigned-wg"}),
+    )
+    app = create_app()
+    app.dependency_overrides[get_config] = lambda: config
+    app.dependency_overrides[get_catalog_service] = lambda: mock_catalog_svc
+    mock_catalog_svc.list_databases.return_value = {
+        "DatabaseList": [
+            {"Name": "assigned_prod"},
+            {"Name": "unassigned_prod"},
+        ]
+    }
+    with TestClient(app) as c:
+        resp = c.get("/api/v1/catalog/databases")
+    items = {item["name"]: item for item in resp.json()["items"]}
+    assert items["assigned_prod"]["workgroup"] == "assigned-wg"
+    assert items["unassigned_prod"]["workgroup"] is None
 
 def test_get_database(client, mock_catalog_svc):
     mock_catalog_svc.get_database.return_value = {
