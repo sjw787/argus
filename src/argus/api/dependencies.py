@@ -138,7 +138,7 @@ def _boto3_session_from_credential_id(
             try:
                 expiry_dt = datetime.fromtimestamp(int(expiration) / 1000, tz=timezone.utc)
             except (ValueError, TypeError):
-                logger.warning("Could not parse credential expiration: %s", expiration)
+                logger.warning("Could not parse credential expiration (unparseable value omitted)")
         if expiry_dt and datetime.now(timezone.utc) >= expiry_dt:
             from argus.core.session_store import delete_session
             delete_session(f"creds:{credential_id}")
