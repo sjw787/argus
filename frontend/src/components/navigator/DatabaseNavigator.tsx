@@ -630,14 +630,19 @@ function TableNode({ dbName, dbIsUnassigned, table, isView, expanded, onToggle, 
   )
 }
 
-function InfoSchemaTableRow({ tableName, expanded, tableDetail, onToggle, onMenuOpen }: {
+function InfoSchemaTableRow({ tableName, expanded, onToggle, onMenuOpen }: {
   tableName: string
   expanded: boolean
-  tableDetail?: { columns: { name: string; type: string }[] }
   onToggle: () => void
   onMenuOpen: (x: number, y: number) => void
 }) {
   const [hovered, setHovered] = useState(false)
+  const { data: tableDetail } = useQuery({
+    queryKey: ['table', 'information_schema', tableName],
+    queryFn: () => api.getTable('information_schema', tableName),
+    enabled: expanded,
+    staleTime: 300000,
+  })
   return (
     <div>
       <div
@@ -683,7 +688,7 @@ function InformationSchemaNode({ onOpenTab, onInsert }: {
   onInsert: (text: string) => void
 }) {
   const [expanded, setExpanded] = useState(false)
-  const [expandedTable, setExpandedTable] = useState<string | null>(null)
+  const [expandedTables, setExpandedTables] = useState<Set<string>>(new Set())
   const [hovered, setHovered] = useState(false)
   const [menu, setMenu] = useState<{ x: number; y: number; tableName: string } | null>(null)
   const { formatStyle } = useThemeStore()
@@ -695,12 +700,13 @@ function InformationSchemaNode({ onOpenTab, onInsert }: {
     staleTime: 300000, // 5 min — rarely changes
   })
 
-  const { data: tableDetail } = useQuery({
-    queryKey: ['table', 'information_schema', expandedTable],
-    queryFn: () => api.getTable('information_schema', expandedTable!),
-    enabled: !!expandedTable,
-    staleTime: 300000,
-  })
+  const toggleTable = (name: string) => {
+    setExpandedTables(prev => {
+      const next = new Set(prev)
+      next.has(name) ? next.delete(name) : next.add(name)
+      return next
+    })
+  }
 
   return (
     <div style={{ borderBottom: '1px solid var(--border)' }}>
@@ -727,9 +733,8 @@ function InformationSchemaNode({ onOpenTab, onInsert }: {
             <InfoSchemaTableRow
               key={t.name}
               tableName={t.name}
-              expanded={expandedTable === t.name}
-              tableDetail={expandedTable === t.name ? tableDetail : undefined}
-              onToggle={() => setExpandedTable(prev => prev === t.name ? null : t.name)}
+              expanded={expandedTables.has(t.name)}
+              onToggle={() => toggleTable(t.name)}
               onMenuOpen={(x, y) => setMenu({ x, y, tableName: t.name })}
             />
           ))}
