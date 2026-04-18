@@ -1,4 +1,5 @@
 from __future__ import annotations
+import re
 import time
 from typing import Annotated, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -247,6 +248,8 @@ def get_information_schema_table(
     athena: Annotated[AthenaService, Depends(get_athena_service)],
 ):
     """Query Athena information_schema.columns to describe a virtual table."""
+    if not re.match(r'^[a-zA-Z0-9_]+$', table_name):
+        raise HTTPException(status_code=400, detail="Invalid table name")
     try:
         sql = (
             f"SELECT column_name, data_type "

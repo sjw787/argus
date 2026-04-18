@@ -15,6 +15,7 @@ from argus.core.auth import (
     get_glue_client,
     get_s3_client,
     get_session_from_credentials,
+    invalidate_session,
 )
 from argus.core.session_store import get_session as get_stored_session
 from argus.models.schemas import AppConfig

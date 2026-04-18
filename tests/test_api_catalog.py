@@ -208,3 +208,53 @@ def test_er_diagram(client, mock_catalog_svc):
     assert len(data["nodes"]) == 2
     # user_id in orders should create edge to user
     assert any(e["source_column"] == "user_id" for e in data["edges"])
+
+
+# ── information_schema SQL injection prevention ───────────────────────────────
+
+class TestInformationSchemaTableSQLInjection:
+    @pytest.fixture
+    def infoschema_client(self, mock_catalog_svc):
+        from argus.api.dependencies import get_athena_service
+        mock_athena = MagicMock()
+        app = create_app()
+        app.dependency_overrides[get_config] = lambda: AppConfig()
+        app.dependency_overrides[get_catalog_service] = lambda: mock_catalog_svc
+        app.dependency_overrides[get_athena_service] = lambda: mock_athena
+        return TestClient(app), mock_athena
+
+    @pytest.mark.parametrize("bad_name", [
+        "foo bar",
+        "foo%20bar",
+        "foo;bar",
+        "foo'",
+        "foo-bar",
+        "1 OR 1=1",
+    ])
+    def test_rejects_invalid_table_names(self, infoschema_client, bad_name):
+        client, mock_athena = infoschema_client
+        import urllib.parse
+        encoded = urllib.parse.quote(bad_name, safe="")
+        resp = client.get(f"/api/v1/catalog/databases/information_schema/tables/{encoded}")
+        assert resp.status_code == 400
+        mock_athena.start_query_execution.assert_not_called()
+
+    @pytest.mark.parametrize("good_name", [
+        "columns",
+        "tables",
+        "COLUMNS",
+        "my_table_123",
+    ])
+    def test_accepts_valid_table_names(self, infoschema_client, good_name):
+        client, mock_athena = infoschema_client
+        mock_athena.start_query_execution.return_value = {"QueryExecutionId": "q1"}
+        mock_athena.wait_for_query.return_value = {
+            "QueryExecution": {"Status": {"State": "SUCCEEDED"}}
+        }
+        mock_athena.get_query_results.return_value = {"ResultSet": {"Rows": []}}
+        resp = client.get(f"/api/v1/catalog/databases/information_schema/tables/{good_name}")
+        assert resp.status_code == 200
+        mock_athena.start_query_execution.assert_called_once()
+        # Verify the table name appears safely in the query (not with extra quotes)
+        call_args = mock_athena.start_query_execution.call_args
+        assert good_name in call_args[1]["query"]

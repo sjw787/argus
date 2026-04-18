@@ -1,9 +1,11 @@
 from __future__ import annotations
+import time
 from typing import Optional
 import boto3
 
 
-_session_cache: dict[tuple, boto3.Session] = {}
+_session_cache: dict[tuple, tuple[boto3.Session, float]] = {}
+_SESSION_TTL = 3600  # 1 hour — boto3 Sessions using IAM/profile credentials
 
 
 def get_session_from_credentials(
@@ -26,14 +28,25 @@ def get_session(
     region: Optional[str] = None,
 ) -> boto3.Session:
     key = (profile, region)
-    if key not in _session_cache:
-        kwargs: dict = {}
-        if profile:
-            kwargs["profile_name"] = profile
-        if region:
-            kwargs["region_name"] = region
-        _session_cache[key] = boto3.Session(**kwargs)
-    return _session_cache[key]
+    entry = _session_cache.get(key)
+    if entry and time.monotonic() - entry[1] < _SESSION_TTL:
+        return entry[0]
+    kwargs: dict = {}
+    if profile:
+        kwargs["profile_name"] = profile
+    if region:
+        kwargs["region_name"] = region
+    session = boto3.Session(**kwargs)
+    _session_cache[key] = (session, time.monotonic())
+    return session
+
+
+def invalidate_session(
+    profile: Optional[str] = None,
+    region: Optional[str] = None,
+) -> None:
+    """Remove a specific cache entry, e.g. after an ExpiredToken error."""
+    _session_cache.pop((profile, region), None)
 
 
 def reset_session_cache() -> None:

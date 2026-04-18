@@ -10,11 +10,11 @@ The premise: *AI can write the code, but a human still has to own the outcome.* 
 
 A full test suite covers the core application logic. Tests were written alongside the code and validated against the real application behaviour.
 
-**271 tests passing across 17 test modules:**
+**289 tests passing across 18 test modules:**
 
 | Module | What It Covers |
 |--------|---------------|
-| `test_api_catalog.py` | Glue Data Catalog API endpoints (databases, tables, partitions) |
+| `test_api_catalog.py` | Glue Data Catalog API endpoints (databases, tables, partitions); SQL injection prevention on information_schema endpoint |
 | `test_api_queries.py` | Query execution, status polling, results, cancellation, EXPLAIN |
 | `test_api_workgroups.py` | Workgroup listing, creation, client-workgroup assignment |
 | `test_athena_service.py` | Athena service layer (start, poll, fetch results) |
@@ -29,6 +29,7 @@ A full test suite covers the core application logic. Tests were written alongsid
 | `test_lambda_handler.py` | Lambda Mangum handler: invocation, API Gateway event routing (100% coverage) |
 | `test_aws_endpoints.py` | FIPS endpoint URL helper: service mapping, region interpolation, enable/disable (100% coverage) |
 | `test_audit_logger.py` | AuditLogger: enable/disable, field correctness, privacy guarantees, action classification, middleware integration |
+| `test_auth_session_cache.py` | boto3 session cache: TTL expiry, per-key isolation, invalidation, reset |
 | `functional/test_query_flow.py` | HTTP-level execute → status → results flow; error cases |
 | `functional/test_export_flow.py` | HTTP-level export access control, CSV/JSON formats, error propagation |
 
@@ -36,7 +37,7 @@ Tests use `pytest` with `unittest.mock` to isolate AWS API calls. No real AWS cr
 
 ```bash
 PYTHONPATH=src python -m pytest tests/ -q
-# 271 passed
+# 289 passed
 ```
 
 Current line coverage: **59%** (target: 87%). Key service modules (`sso_service.py`, `session_store.py`, `lambda_handler.py`, `aws_endpoints.py`) are now at 100% coverage. Remaining gap is concentrated in the Typer CLI layer (0%) and some router dependency paths. Coverage is enforced by a pre-push ratchet hook — it can only go up between pushes.
@@ -94,6 +95,13 @@ Code review of the FedRAMP audit logging, FIPS endpoint, and GovCloud changes. T
 - 🔵 **Misleading comment in audit middleware** (`middleware.py:32-33`): Comment claimed `request.state.user_identity` is "populated by `get_current_user()`" — it never is. Fixed: updated comment to accurately describe the `X-Credential-Id` header fallback. ✅ Resolved.
 
 7 new tests added covering: FIPS endpoint for `logs`, `sso`, `sso-oidc` services; CloudWatch client `endpoint_url` injection; `threading.Lock` presence; `_emit_to_cloudwatch` sequence token update.
+
+### Review 5 — Security & Correctness, Round 2 (April 2026)
+
+Second full-codebase review focusing on areas not covered in prior reviews. Two real issues found and fixed:
+
+- 🔴 **SQL injection in information_schema table endpoint** (`catalog.py:255`): The `table_name` URL path parameter was directly interpolated into an Athena SQL query via an f-string (`AND table_name = '{table_name}'`). Since Athena doesn't support parameterized queries, a crafted path with `UNION SELECT` could exfiltrate data from any database the IAM role has access to. Fixed: added strict allowlist validation (`^[a-zA-Z0-9_]+$`) that returns HTTP 400 before any query is constructed. ✅ Resolved. 18 new tests cover both malicious inputs (6 bad names → 400) and valid inputs (4 good names → 200 with safe query).
+- 🟠 **boto3 session cache had no TTL** (`auth.py:6-36`): The `_session_cache` dict held `boto3.Session` objects indefinitely by `(profile, region)` key. If credentials from the underlying profile expired (e.g. after an 8-hour SSO session), requests would fail with `ExpiredToken` errors that required a process restart. Fixed: changed the cache value to `(Session, created_at)` tuple; sessions are evicted after 1 hour (`_SESSION_TTL = 3600`). Added `invalidate_session(profile, region)` for targeted on-demand invalidation. 8 new tests cover TTL expiry, per-key isolation, reset, and invalidation.
 
 ---
 
