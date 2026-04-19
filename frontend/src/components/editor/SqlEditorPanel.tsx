@@ -58,14 +58,24 @@ function getStatementStartLines(sql: string): number[] {
 }
 
 /** Extract the database name from a SQL statement by finding the first qualified
- *  table reference (db.table or catalog.db.table). Returns null if none found. */
+ *  table reference. Handles both unquoted identifiers and double-quoted identifiers,
+ *  e.g. "db"."table", db.table, or catalog.db.table. Returns null if none found. */
 function extractStatementDatabase(sql: string): string | null {
-  // Match: KEYWORD  word.word  or  word.word.word  (catalog.db.table)
-  const re = /\b(?:FROM|JOIN|INTO|UPDATE|TABLE)\s+([a-zA-Z_][a-zA-Z0-9_]*)\.([a-zA-Z_][a-zA-Z0-9_]*)(?:\.([a-zA-Z_][a-zA-Z0-9_]*))?/gi
+  // Each identifier is either "quoted content" or an unquoted word
+  const id = `(?:"([^"]+)"|([a-zA-Z_][a-zA-Z0-9_]*))`
+  // Match: KEYWORD  id.id  or  id.id.id
+  const re = new RegExp(
+    `\\b(?:FROM|JOIN|INTO|UPDATE|TABLE)\\s+${id}\\.${id}(?:\\.${id})?`,
+    'gi'
+  )
   const match = re.exec(sql)
   if (!match) return null
-  // Three-part name → catalog.database.table, use middle segment
-  return (match[3] ? match[2] : match[1]).toLowerCase()
+  // Groups: 1,2 = first id (quoted,unquoted)  3,4 = second id  5,6 = optional third id
+  const isThreePart = match[5] !== undefined || match[6] !== undefined
+  // Two-part → db.table:   db is groups 1/2
+  // Three-part → cat.db.table: db is groups 3/4 (middle)
+  const db = isThreePart ? (match[3] ?? match[4]) : (match[1] ?? match[2])
+  return db ? db.toLowerCase() : null
 }
 
 
