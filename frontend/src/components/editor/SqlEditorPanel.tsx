@@ -69,6 +69,7 @@ function extractStatementDatabase(sql: string): string | null {
 }
 
 
+function DatabasePicker({ value, onChange }: {
   value: string
   onChange: (v: string) => void
 }) {
