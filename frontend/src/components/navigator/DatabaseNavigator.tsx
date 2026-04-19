@@ -344,6 +344,10 @@ function WorkgroupRow({
 }: WorkgroupRowProps) {
   const [hovered, setHovered] = useState(false)
   const isUnassigned = workgroup === UNASSIGNED
+  const containsActiveTabDb = useEditorStore(s => {
+    const active = s.tabs.find(t => t.id === s.activeTabId)
+    return !!active?.database && dbs.some(d => d.name === active.database)
+  })
 
   return (
     <div>
@@ -358,7 +362,7 @@ function WorkgroupRow({
         {isUnassigned
           ? <Lock size={12} style={{ color: 'var(--warning)', opacity: 0.8 }} />
           : <Layers size={13} style={{ color: 'var(--accent)', opacity: 0.7 }} />}
-        <span className="font-bold uppercase tracking-wide truncate" style={{ fontSize: 10 }}>
+        <span className={`uppercase tracking-wide truncate${containsActiveTabDb ? ' font-bold' : ''}`} style={{ fontSize: 10 }}>
           {workgroup}
         </span>
         <span style={{ fontSize: 10 }}>{dbs.length}</span>
