@@ -52,22 +52,33 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
 }
 .argus-stmt-glyph::after {
   content: '';
   display: block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  opacity: 0.7;
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 7px solid var(--accent);
+  opacity: 0.45;
+  transition: opacity 0.1s ease;
+}
+.argus-stmt-glyph:hover::after {
+  opacity: 1;
 }
 .argus-stmt-glyph-unassigned::after {
   content: '';
   display: block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--text-muted);
-  opacity: 0.7;
+  width: 0;
+  height: 0;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  border-left: 7px solid var(--text-muted);
+  opacity: 0.45;
+  transition: opacity 0.1s ease;
+}
+.argus-stmt-glyph-unassigned:hover::after {
+  opacity: 1;
 }

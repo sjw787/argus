@@ -207,6 +207,7 @@ export function SqlEditorPanel({ tabId }: Props) {
   const queryClient = useQueryClient()
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null)
   const decorationsRef = useRef<Monaco.editor.IEditorDecorationsCollection | null>(null)
+  const runStmtAtLineRef = useRef<(lineNumber: number) => void>(() => {})
   const [editorReady, setEditorReady] = useState(false)
   const monaco = useMonaco()
 
@@ -215,6 +216,49 @@ export function SqlEditorPanel({ tabId }: Props) {
     queryFn: () => api.getAssignments(),
     staleTime: 60_000,
   })
+
+  // Extracted single-statement runner shared by handleRun and the gutter play button.
+  const runSingleStatement = useCallback(async (stmt: string, execDb: string, title?: string) => {
+    updateTab(tabId, {
+      isLoading: true,
+      queryExecutionId: undefined,
+      queryExecutions: undefined,
+      queryState: 'RUNNING',
+      queryError: undefined,
+      limitApplied: false,
+      activeResultIdx: undefined,
+    })
+    try {
+      const data = await api.executeQuery({ sql: stmt, database: execDb, auto_limit: autoLimit > 0 ? autoLimit : undefined })
+      updateTab(tabId, { queryExecutionId: data.query_execution_id, limitApplied: data.limit_applied })
+      if (title) setName(data.query_execution_id, title)
+      const comment = extractSqlComment(stmt)
+      if (comment) setDescription(data.query_execution_id, comment)
+      const poll = async () => {
+        const detail = await api.getQuery(data.query_execution_id)
+        const state = detail.status.state
+        updateTab(tabId, { queryState: state })
+        if (state === 'RUNNING' || state === 'QUEUED') {
+          setTimeout(poll, 1500)
+        } else {
+          updateTab(tabId, {
+            isLoading: false,
+            queryError: state === 'FAILED' ? (detail.status.state_change_reason ?? 'Query failed') : undefined,
+          })
+          if (state === 'SUCCEEDED') {
+            queryClient.invalidateQueries({ queryKey: ['queryHistory'] })
+            queryClient.invalidateQueries({ queryKey: ['tables'] })
+            queryClient.invalidateQueries({ queryKey: ['table'] })
+            queryClient.invalidateQueries({ queryKey: ['queryResults', data.query_execution_id] })
+          }
+        }
+      }
+      poll()
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Failed to submit query'
+      updateTab(tabId, { isLoading: false, queryState: 'FAILED', queryError: msg })
+    }
+  }, [tabId, updateTab, autoLimit, queryClient, setName, setDescription])
 
   const [explainPlanType, setExplainPlanType] = useState<ExplainPlanType>('LOGICAL')
   const [explainDropdownOpen, setExplainDropdownOpen] = useState(false)
@@ -278,7 +322,28 @@ export function SqlEditorPanel({ tabId }: Props) {
     )
   }, [editorReady, tab?.sql, tab?.database, assignmentsData])
 
-  const handleEditorMount: OnMount = (editor) => {
+  // Keep runStmtAtLineRef current so the stable onMouseDown handler always has fresh sql/db data.
+  useEffect(() => {
+    const sql = tab?.sql ?? ''
+    const database = tab?.database ?? ''
+    const startLines = getStatementStartLines(sql)
+    const stmts = splitSqlStatements(sql)
+    runStmtAtLineRef.current = (lineNumber: number) => {
+      if (!database || !sql.trim()) return
+      // Find the last statement whose start line is ≤ the clicked line
+      let stmtIdx = -1
+      for (let i = 0; i < startLines.length; i++) {
+        if (startLines[i] <= lineNumber) stmtIdx = i
+        else break
+      }
+      if (stmtIdx === -1 || !stmts[stmtIdx]) return
+      const stmt = stmts[stmtIdx]
+      const execDb = extractStatementDatabase(stmt) ?? database
+      runSingleStatement(stmt, execDb)
+    }
+  }, [tab?.sql, tab?.database, runSingleStatement])
+
+  const handleEditorMount: OnMount = (editor, monacoInstance) => {
     editorRef.current = editor
     setEditorReady(true)
     if (monaco && sqlDiagnostics) registerSqlDiagnostics(monaco, editor)
@@ -287,6 +352,13 @@ export function SqlEditorPanel({ tabId }: Props) {
     if (import.meta.env.VITE_ENABLE_MSW === 'true') {
       ;(window as unknown as Record<string, unknown>).__argus_editor = editor
     }
+
+    // Gutter play button: click on a glyph margin marker runs that statement.
+    editor.onMouseDown(e => {
+      if (e.target.type !== monacoInstance.editor.MouseTargetType.GUTTER_GLYPH_MARGIN) return
+      const lineNumber = e.target.position?.lineNumber
+      if (lineNumber) runStmtAtLineRef.current(lineNumber)
+    })
 
     // Highest-priority Space override: intercept at the keydown event level,
     // BEFORE Monaco's command/keybinding service routes the event to whatever
@@ -353,48 +425,9 @@ export function SqlEditorPanel({ tabId }: Props) {
     if (statements.length === 0) return
 
     if (statements.length === 1) {
-      // Single query — original path
-      updateTab(tabId, {
-        isLoading: true,
-        queryExecutionId: undefined,
-        queryExecutions: undefined,
-        queryState: 'RUNNING',
-        queryError: undefined,
-        limitApplied: false,
-        activeResultIdx: undefined,
-      })
-      try {
-        const parsedDb = extractStatementDatabase(statements[0])
-        const execDb = parsedDb ?? tab.database
-        const data = await api.executeQuery({ sql: statements[0], database: execDb, auto_limit: autoLimit > 0 ? autoLimit : undefined })
-        updateTab(tabId, { queryExecutionId: data.query_execution_id, limitApplied: data.limit_applied })
-        if (tab.title) setName(data.query_execution_id, tab.title)
-        const comment = extractSqlComment(sqlToRun)
-        if (comment) setDescription(data.query_execution_id, comment)
-        const poll = async () => {
-          const detail = await api.getQuery(data.query_execution_id)
-          const state = detail.status.state
-          updateTab(tabId, { queryState: state })
-          if (state === 'RUNNING' || state === 'QUEUED') {
-            setTimeout(poll, 1500)
-          } else {
-            updateTab(tabId, {
-              isLoading: false,
-              queryError: state === 'FAILED' ? (detail.status.state_change_reason ?? 'Query failed') : undefined,
-            })
-            if (state === 'SUCCEEDED') {
-              queryClient.invalidateQueries({ queryKey: ['queryHistory'] })
-              queryClient.invalidateQueries({ queryKey: ['tables'] })
-              queryClient.invalidateQueries({ queryKey: ['table'] })
-              queryClient.invalidateQueries({ queryKey: ['queryResults', data.query_execution_id] })
-            }
-          }
-        }
-        poll()
-      } catch (err: unknown) {
-        const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Failed to submit query'
-        updateTab(tabId, { isLoading: false, queryState: 'FAILED', queryError: msg })
-      }
+      const parsedDb = extractStatementDatabase(statements[0])
+      const execDb = parsedDb ?? tab.database
+      await runSingleStatement(statements[0], execDb, tab.title)
       return
     }
 
