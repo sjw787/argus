@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react'
 import { Allotment } from 'allotment'
 import Editor, { useMonaco, type OnMount } from '@monaco-editor/react'
 import type * as Monaco from 'monaco-editor'
-import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api } from '../../api/client'
 import type { ExplainPlanType } from '../../api/client'
 import { useEditorStore } from '../../stores/editorStore'
@@ -16,6 +16,46 @@ import { Play, ChevronDown, Search, WandSparkles, Loader, FileSearch } from 'luc
 
 
 const PAGE_LIMIT = 50
+
+/** Walk the SQL character-by-character and return the 1-based line number
+ *  of the first non-whitespace character in each statement. Respects
+ *  single-quoted strings, line comments, and block comments. */
+function getStatementStartLines(sql: string): number[] {
+  const startLines: number[] = []
+  let i = 0, line = 1
+  let stmtStartLine: number | null = null
+  let inString = false, inLineComment = false, inBlockComment = false
+  while (i < sql.length) {
+    const ch = sql[i]
+    if (ch === '\n') {
+      if (inLineComment) inLineComment = false
+      line++; i++; continue
+    }
+    if (inLineComment) { i++; continue }
+    if (inBlockComment) {
+      if (ch === '*' && sql[i + 1] === '/') { inBlockComment = false; i += 2 }
+      else i++
+      continue
+    }
+    if (inString) {
+      if (ch === "'" && sql[i + 1] === "'") i += 2
+      else if (ch === "'") { inString = false; i++ }
+      else i++
+      continue
+    }
+    if (ch === '-' && sql[i + 1] === '-') { inLineComment = true; i += 2; continue }
+    if (ch === '/' && sql[i + 1] === '*') { inBlockComment = true; i += 2; continue }
+    if (ch === "'") { inString = true; i++; continue }
+    if (ch === ';') {
+      if (stmtStartLine !== null) { startLines.push(stmtStartLine); stmtStartLine = null }
+      i++; continue
+    }
+    if (ch.trim() !== '' && stmtStartLine === null) stmtStartLine = line
+    i++
+  }
+  if (stmtStartLine !== null) startLines.push(stmtStartLine)
+  return startLines
+}
 
 function DatabasePicker({ value, onChange }: {
   value: string
@@ -144,7 +184,15 @@ export function SqlEditorPanel({ tabId }: Props) {
   const tab = tabs.find(t => t.id === tabId)
   const queryClient = useQueryClient()
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null)
+  const decorationsRef = useRef<Monaco.editor.IEditorDecorationsCollection | null>(null)
+  const [editorReady, setEditorReady] = useState(false)
   const monaco = useMonaco()
+
+  const { data: assignmentsData } = useQuery({
+    queryKey: ['assignments'],
+    queryFn: () => api.getAssignments(),
+    staleTime: 60_000,
+  })
 
   const [explainPlanType, setExplainPlanType] = useState<ExplainPlanType>('LOGICAL')
   const [explainDropdownOpen, setExplainDropdownOpen] = useState(false)
@@ -178,8 +226,35 @@ export function SqlEditorPanel({ tabId }: Props) {
     }
   }, [tabId, activeTabId, tab?.database])
 
+  // Update gutter decorations whenever SQL, database, or assignments change
+  useEffect(() => {
+    const editor = editorRef.current
+    if (!editor || !tab) return
+    if (!decorationsRef.current) {
+      decorationsRef.current = editor.createDecorationsCollection([])
+    }
+    const workgroup = tab.database ? (assignmentsData?.assignments[tab.database] ?? null) : null
+    const glyphClass = (tab.database && !workgroup) ? 'argus-stmt-glyph-unassigned' : 'argus-stmt-glyph'
+    const hoverMsg = !tab.database
+      ? '→ no database selected'
+      : workgroup
+        ? `→ workgroup: **${workgroup}**`
+        : '→ workgroup: *(unassigned — will use default)*'
+    const startLines = getStatementStartLines(tab.sql)
+    decorationsRef.current.set(
+      startLines.map(lineNumber => ({
+        range: { startLineNumber: lineNumber, startColumn: 1, endLineNumber: lineNumber, endColumn: 1 },
+        options: {
+          glyphMarginClassName: glyphClass,
+          glyphMarginHoverMessage: { value: hoverMsg },
+        },
+      }))
+    )
+  }, [editorReady, tab?.sql, tab?.database, assignmentsData])
+
   const handleEditorMount: OnMount = (editor) => {
     editorRef.current = editor
+    setEditorReady(true)
     if (monaco && sqlDiagnostics) registerSqlDiagnostics(monaco, editor)
 
     // Expose the editor instance for E2E tests (MSW dev/test mode only).
@@ -598,6 +673,7 @@ export function SqlEditorPanel({ tabId }: Props) {
               minimap: { enabled: false },
               fontSize: 13,
               lineNumbers: 'on',
+              glyphMargin: true,
               scrollBeyondLastLine: false,
               wordWrap: 'on',
               tabSize: 2,
