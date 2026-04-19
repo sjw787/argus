@@ -57,7 +57,18 @@ function getStatementStartLines(sql: string): number[] {
   return startLines
 }
 
-function DatabasePicker({ value, onChange }: {
+/** Extract the database name from a SQL statement by finding the first qualified
+ *  table reference (db.table or catalog.db.table). Returns null if none found. */
+function extractStatementDatabase(sql: string): string | null {
+  // Match: KEYWORD  word.word  or  word.word.word  (catalog.db.table)
+  const re = /\b(?:FROM|JOIN|INTO|UPDATE|TABLE)\s+([a-zA-Z_][a-zA-Z0-9_]*)\.([a-zA-Z_][a-zA-Z0-9_]*)(?:\.([a-zA-Z_][a-zA-Z0-9_]*))?/gi
+  const match = re.exec(sql)
+  if (!match) return null
+  // Three-part name → catalog.database.table, use middle segment
+  return (match[3] ? match[2] : match[1]).toLowerCase()
+}
+
+
   value: string
   onChange: (v: string) => void
 }) {
@@ -233,22 +244,26 @@ export function SqlEditorPanel({ tabId }: Props) {
     if (!decorationsRef.current) {
       decorationsRef.current = editor.createDecorationsCollection([])
     }
-    const workgroup = tab.database ? (assignmentsData?.assignments[tab.database] ?? null) : null
-    const glyphClass = (tab.database && !workgroup) ? 'argus-stmt-glyph-unassigned' : 'argus-stmt-glyph'
-    const hoverMsg = !tab.database
-      ? '→ no database selected'
-      : workgroup
-        ? `→ workgroup: **${workgroup}**`
-        : '→ workgroup: *(unassigned — will use default)*'
+    const assignments = assignmentsData?.assignments ?? {}
+    const stmts = splitSqlStatements(tab.sql)
     const startLines = getStatementStartLines(tab.sql)
     decorationsRef.current.set(
-      startLines.map(lineNumber => ({
-        range: { startLineNumber: lineNumber, startColumn: 1, endLineNumber: lineNumber, endColumn: 1 },
-        options: {
-          glyphMarginClassName: glyphClass,
-          glyphMarginHoverMessage: { value: hoverMsg },
-        },
-      }))
+      startLines.map((lineNumber, i) => {
+        const parsedDb = stmts[i] ? extractStatementDatabase(stmts[i]) : null
+        const db = parsedDb ?? tab.database
+        const workgroup = db ? (assignments[db] ?? null) : null
+        const glyphClass = (db && !workgroup) ? 'argus-stmt-glyph-unassigned' : 'argus-stmt-glyph'
+        const sourceNote = parsedDb && parsedDb !== tab.database ? ` *(detected from SQL)*` : ''
+        const hoverMsg = !db
+          ? '→ no database selected'
+          : workgroup
+            ? `→ **${db}** · workgroup: **${workgroup}**${sourceNote}`
+            : `→ **${db}** · workgroup: *(unassigned — will use default)*${sourceNote}`
+        return {
+          range: { startLineNumber: lineNumber, startColumn: 1, endLineNumber: lineNumber, endColumn: 1 },
+          options: { glyphMarginClassName: glyphClass, glyphMarginHoverMessage: { value: hoverMsg } },
+        }
+      })
     )
   }, [editorReady, tab?.sql, tab?.database, assignmentsData])
 
@@ -338,7 +353,9 @@ export function SqlEditorPanel({ tabId }: Props) {
         activeResultIdx: undefined,
       })
       try {
-        const data = await api.executeQuery({ sql: statements[0], database: tab.database, auto_limit: autoLimit > 0 ? autoLimit : undefined })
+        const parsedDb = extractStatementDatabase(statements[0])
+        const execDb = parsedDb ?? tab.database
+        const data = await api.executeQuery({ sql: statements[0], database: execDb, auto_limit: autoLimit > 0 ? autoLimit : undefined })
         updateTab(tabId, { queryExecutionId: data.query_execution_id, limitApplied: data.limit_applied })
         if (tab.title) setName(data.query_execution_id, tab.title)
         const comment = extractSqlComment(sqlToRun)
@@ -382,7 +399,10 @@ export function SqlEditorPanel({ tabId }: Props) {
     })
 
     const submitted = await Promise.allSettled(
-      statements.map(sql => api.executeQuery({ sql, database: tab.database, auto_limit: autoLimit > 0 ? autoLimit : undefined }))
+      statements.map(stmt => {
+        const parsedDb = extractStatementDatabase(stmt)
+        return api.executeQuery({ sql: stmt, database: parsedDb ?? tab.database, auto_limit: autoLimit > 0 ? autoLimit : undefined })
+      })
     )
 
     const initialExecs = submitted.map((r, i) =>
