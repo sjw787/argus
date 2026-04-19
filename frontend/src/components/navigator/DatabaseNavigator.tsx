@@ -415,6 +415,10 @@ interface DatabaseNodeProps {
 function DatabaseNode({ db, isUnassigned, expanded, expandedTables, onToggle, onToggleTable, onSelectTable, onDbMenu, onTableMenu }: DatabaseNodeProps) {
   const [hovered, setHovered] = useState(false)
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set(['tables']))
+  const isActiveTabDb = useEditorStore(s => {
+    const active = s.tabs.find(t => t.id === s.activeTabId)
+    return active?.database === db.name
+  })
 
   const isDefault = db.name === DEFAULT_DB
   // The "default" AWS database is always queryable via the primary workgroup
@@ -456,7 +460,7 @@ function DatabaseNode({ db, isUnassigned, expanded, expandedTables, onToggle, on
         {effectivelyUnassigned
           ? <Lock size={12} style={{ color: 'var(--warning)' }} />
           : <Database size={13} style={{ color: 'var(--accent)' }} />}
-        <span className="flex-1 truncate font-bold">{db.name}</span>
+        <span className={`flex-1 truncate${isActiveTabDb ? ' font-bold' : ''}`}>{db.name}</span>
         {hovered && (
           <button
             onClick={e => onDbMenu(e, db)}
