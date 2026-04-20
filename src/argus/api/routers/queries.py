@@ -26,6 +26,7 @@ def _parse_execution(qe: dict) -> QueryExecutionDetail:
     stats = qe.get("Statistics", {})
     ctx = qe.get("QueryExecutionContext", {})
     rc = qe.get("ResultConfiguration", {})
+    reuse_info = qe.get("ResultReuseInformation", {})
     return QueryExecutionDetail(
         query_execution_id=qe["QueryExecutionId"],
         query=qe.get("Query", ""),
@@ -44,6 +45,7 @@ def _parse_execution(qe: dict) -> QueryExecutionDetail:
             service_processing_time_ms=stats.get("ServiceProcessingTimeInMillis"),
         ),
         output_location=rc.get("OutputLocation"),
+        reused_previous_result=reuse_info.get("ReusedPreviousResult", False),
     )
 
 
@@ -171,6 +173,8 @@ def execute_query(
             workgroup=body.workgroup,
             output_location=body.output_location,
             schema_name=body.schema_name,
+            result_reuse_enabled=body.result_reuse_enabled,
+            result_reuse_max_age_minutes=body.result_reuse_max_age_minutes,
         )
         return ExecuteQueryResponse(query_execution_id=resp["QueryExecutionId"], limit_applied=limit_applied)
     except Exception as e:

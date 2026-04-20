@@ -202,6 +202,8 @@ export function SqlEditorPanel({ tabId }: Props) {
   const sqlDiagnostics = useThemeStore(s => s.sqlDiagnostics)
   const autoLimit = useThemeStore(s => s.autoLimit)
   const formatStyle = useThemeStore(s => s.formatStyle)
+  const resultReuseEnabled = useThemeStore(s => s.resultReuseEnabled)
+  const resultReuseMaxAge = useThemeStore(s => s.resultReuseMaxAge)
   const { setName, setDescription } = useQueryNamesStore()
   const tab = tabs.find(t => t.id === tabId)
   const queryClient = useQueryClient()
@@ -226,10 +228,16 @@ export function SqlEditorPanel({ tabId }: Props) {
       queryState: 'RUNNING',
       queryError: undefined,
       limitApplied: false,
+      reusedPreviousResult: false,
       activeResultIdx: undefined,
     })
     try {
-      const data = await api.executeQuery({ sql: stmt, database: execDb, auto_limit: autoLimit > 0 ? autoLimit : undefined })
+      const data = await api.executeQuery({
+        sql: stmt,
+        database: execDb,
+        auto_limit: autoLimit > 0 ? autoLimit : undefined,
+        ...(resultReuseEnabled ? { result_reuse_enabled: true, result_reuse_max_age_minutes: resultReuseMaxAge } : {}),
+      })
       updateTab(tabId, { queryExecutionId: data.query_execution_id, limitApplied: data.limit_applied })
       if (title) setName(data.query_execution_id, title)
       const comment = extractSqlComment(stmt)
@@ -244,6 +252,7 @@ export function SqlEditorPanel({ tabId }: Props) {
           updateTab(tabId, {
             isLoading: false,
             queryError: state === 'FAILED' ? (detail.status.state_change_reason ?? 'Query failed') : undefined,
+            reusedPreviousResult: state === 'SUCCEEDED' ? (detail.reused_previous_result ?? false) : false,
           })
           if (state === 'SUCCEEDED') {
             queryClient.invalidateQueries({ queryKey: ['queryHistory'] })
@@ -258,7 +267,7 @@ export function SqlEditorPanel({ tabId }: Props) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ?? 'Failed to submit query'
       updateTab(tabId, { isLoading: false, queryState: 'FAILED', queryError: msg })
     }
-  }, [tabId, updateTab, autoLimit, queryClient, setName, setDescription])
+  }, [tabId, updateTab, autoLimit, resultReuseEnabled, resultReuseMaxAge, queryClient, setName, setDescription])
 
   const [explainPlanType, setExplainPlanType] = useState<ExplainPlanType>('LOGICAL')
   const [explainDropdownOpen, setExplainDropdownOpen] = useState(false)
@@ -445,7 +454,12 @@ export function SqlEditorPanel({ tabId }: Props) {
     const submitted = await Promise.allSettled(
       statements.map(stmt => {
         const parsedDb = extractStatementDatabase(stmt)
-        return api.executeQuery({ sql: stmt, database: parsedDb ?? tab.database, auto_limit: autoLimit > 0 ? autoLimit : undefined })
+        return api.executeQuery({
+          sql: stmt,
+          database: parsedDb ?? tab.database,
+          auto_limit: autoLimit > 0 ? autoLimit : undefined,
+          ...(resultReuseEnabled ? { result_reuse_enabled: true, result_reuse_max_age_minutes: resultReuseMaxAge } : {}),
+        })
       })
     )
 
@@ -477,7 +491,12 @@ export function SqlEditorPanel({ tabId }: Props) {
           if (!t) return
           useEditorStore.getState().updateTab(tabId, {
             queryExecutions: t.queryExecutions?.map((e, i) =>
-              i === idx ? { ...e, state, error: state === 'FAILED' ? (detail.status.state_change_reason ?? 'Query failed') : undefined } : e
+              i === idx ? {
+                ...e,
+                state,
+                error: state === 'FAILED' ? (detail.status.state_change_reason ?? 'Query failed') : undefined,
+                reused: state === 'SUCCEEDED' ? (detail.reused_previous_result ?? false) : undefined,
+              } : e
             ),
           })
           if (state === 'RUNNING' || state === 'QUEUED') {
@@ -810,6 +829,7 @@ export function SqlEditorPanel({ tabId }: Props) {
                     queryExecutionId={exec.id}
                     queryState={exec.state}
                     limitApplied={exec.limitApplied}
+                    reusedPreviousResult={exec.reused}
                     autoLimit={autoLimit}
                     tabId={tabId}
                     queryIndex={tab.activeResultIdx ?? 0}
@@ -829,6 +849,7 @@ export function SqlEditorPanel({ tabId }: Props) {
               queryState={tab.queryState}
               queryError={tab.queryError}
               limitApplied={tab.limitApplied}
+              reusedPreviousResult={tab.reusedPreviousResult}
               autoLimit={autoLimit}
               tabId={tabId}
               onCancel={(tab.queryState === 'RUNNING' || tab.queryState === 'QUEUED') && tab.queryExecutionId ? () => handleCancel(tab.queryExecutionId!) : undefined}

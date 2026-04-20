@@ -6,6 +6,7 @@ export interface QueryExecution {
   state: string
   error?: string
   limitApplied?: boolean
+  reused?: boolean
 }
 
 export interface EditorTab {
@@ -20,6 +21,7 @@ export interface EditorTab {
   queryError?: string
   isLoading: boolean
   limitApplied?: boolean
+  reusedPreviousResult?: boolean
   // Multi-query support
   queryExecutions?: QueryExecution[]
   activeResultIdx?: number

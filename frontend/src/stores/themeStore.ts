@@ -12,6 +12,8 @@ interface ThemeStore {
   showInformationSchema: boolean
   autoLimit: number
   formatStyle: FormatStyle
+  resultReuseEnabled: boolean
+  resultReuseMaxAge: number
   setTheme: (theme: Theme) => void
   toggleTheme: () => void
   setSqlAutocomplete: (v: boolean) => void
@@ -20,6 +22,8 @@ interface ThemeStore {
   setShowInformationSchema: (v: boolean) => void
   setAutoLimit: (v: number) => void
   setFormatStyle: (v: FormatStyle) => void
+  setResultReuseEnabled: (v: boolean) => void
+  setResultReuseMaxAge: (v: number) => void
 }
 
 export const useThemeStore = create<ThemeStore>()(
@@ -32,6 +36,8 @@ export const useThemeStore = create<ThemeStore>()(
       showInformationSchema: true,
       autoLimit: 500,
       formatStyle: 'standard' as FormatStyle,
+      resultReuseEnabled: false,
+      resultReuseMaxAge: 60,
       setTheme: (theme) => {
         set({ theme })
         document.documentElement.setAttribute('data-theme', theme)
@@ -46,6 +52,8 @@ export const useThemeStore = create<ThemeStore>()(
       setShowInformationSchema: (showInformationSchema) => set({ showInformationSchema }),
       setAutoLimit: (autoLimit) => set({ autoLimit }),
       setFormatStyle: (formatStyle) => set({ formatStyle }),
+      setResultReuseEnabled: (resultReuseEnabled) => set({ resultReuseEnabled }),
+      setResultReuseMaxAge: (resultReuseMaxAge) => set({ resultReuseMaxAge }),
     }),
     { name: 'argus-theme' }
   )

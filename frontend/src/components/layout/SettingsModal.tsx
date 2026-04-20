@@ -109,6 +109,8 @@ export function SettingsModal({ onClose }: Props) {
     showInformationSchema, setShowInformationSchema,
     autoLimit, setAutoLimit,
     formatStyle, setFormatStyle,
+    resultReuseEnabled, setResultReuseEnabled,
+    resultReuseMaxAge, setResultReuseMaxAge,
   } = useThemeStore()
   const { profile, region, clear: clearAuth } = useAuthStore()
   const { data: config } = useQuery({ queryKey: ['config'], queryFn: api.getConfig, staleTime: 60000 })
@@ -307,6 +309,36 @@ export function SettingsModal({ onClose }: Props) {
                     }}
                   />
                 </SettingRow>
+
+                <SettingRow
+                  label="Reuse query results"
+                  description="When enabled, Athena returns cached results from a previous identical query instead of re-running it — saving time and cost."
+                >
+                  <Toggle on={resultReuseEnabled} onToggle={() => setResultReuseEnabled(!resultReuseEnabled)} />
+                </SettingRow>
+
+                {resultReuseEnabled && (
+                  <SettingRow
+                    label="Max result age (minutes)"
+                    description="How old cached results can be. Range: 1–10080 (7 days)."
+                  >
+                    <input
+                      type="number"
+                      min={1}
+                      max={10080}
+                      step={60}
+                      value={resultReuseMaxAge}
+                      onChange={e => setResultReuseMaxAge(Math.min(10080, Math.max(1, parseInt(e.target.value) || 60)))}
+                      className="text-xs text-right rounded px-2 py-0.5 w-24"
+                      style={{
+                        background: 'var(--bg-panel)',
+                        color: 'var(--text-primary)',
+                        border: '1px solid var(--border)',
+                        outline: 'none',
+                      }}
+                    />
+                  </SettingRow>
+                )}
               </>
             )}
 

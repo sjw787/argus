@@ -44,6 +44,8 @@ export interface ExecuteQueryRequest {
   output_location?: string
   schema_name?: string
   auto_limit?: number
+  result_reuse_enabled?: boolean
+  result_reuse_max_age_minutes?: number
 }
 
 export interface ExecuteQueryResponse {
@@ -71,6 +73,7 @@ export interface QueryExecutionDetail {
   status: QueryStatus
   stats: QueryStats
   output_location?: string
+  reused_previous_result?: boolean
 }
 
 export interface QueryStatusSnapshot {

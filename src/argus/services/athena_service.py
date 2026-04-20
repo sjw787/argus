@@ -16,6 +16,8 @@ class AthenaService:
         workgroup: Optional[str] = None,
         output_location: Optional[str] = None,
         schema_name: Optional[str] = None,
+        result_reuse_enabled: bool = False,
+        result_reuse_max_age_minutes: int = 60,
     ) -> dict:
         """Start a query. Auto-resolves workgroup from database name if not provided."""
         resolved_wg = workgroup or self._resolve_workgroup(database, schema_name)
@@ -29,6 +31,13 @@ class AthenaService:
             params["WorkGroup"] = resolved_wg
         if resolved_s3:
             params["ResultConfiguration"] = {"OutputLocation": resolved_s3}
+        if result_reuse_enabled:
+            params["ResultReuseConfiguration"] = {
+                "ResultReuseByAgeConfiguration": {
+                    "Enabled": True,
+                    "MaxAgeInMinutes": result_reuse_max_age_minutes,
+                }
+            }
 
         return self._client.start_query_execution(**params)
 

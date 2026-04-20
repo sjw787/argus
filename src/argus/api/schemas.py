@@ -13,6 +13,8 @@ class ExecuteQueryRequest(BaseModel):
     output_location: Optional[str] = None
     schema_name: Optional[str] = None
     auto_limit: Optional[int] = 500
+    result_reuse_enabled: bool = False
+    result_reuse_max_age_minutes: int = Field(default=60, ge=1, le=10080)
 
 
 class ExecuteQueryResponse(BaseModel):
@@ -58,6 +60,7 @@ class QueryExecutionDetail(BaseModel):
     status: QueryStatus
     stats: QueryStats
     output_location: Optional[str] = None
+    reused_previous_result: bool = False
 
 
 class ResultColumn(BaseModel):

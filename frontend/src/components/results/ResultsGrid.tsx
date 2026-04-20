@@ -13,6 +13,7 @@ interface Props {
   queryState?: string
   queryError?: string
   limitApplied?: boolean
+  reusedPreviousResult?: boolean
   autoLimit?: number
   onCancel?: () => void
   tabId?: string
@@ -29,7 +30,7 @@ interface CellMenu {
   colType?: string
 }
 
-export function ResultsGrid({ queryExecutionId, queryState, queryError, limitApplied, autoLimit, onCancel, tabId, queryIndex }: Props) {
+export function ResultsGrid({ queryExecutionId, queryState, queryError, limitApplied, reusedPreviousResult, autoLimit, onCancel, tabId, queryIndex }: Props) {
   const [isExporting, setIsExporting] = useState(false)
   const [cellMenu, setCellMenu] = useState<CellMenu | null>(null)
   const gridApiRef = useRef<GridApi | null>(null)
@@ -209,6 +210,15 @@ export function ResultsGrid({ queryExecutionId, queryState, queryError, limitApp
             title="Query had no LIMIT clause — auto-limit was applied. Add an explicit LIMIT to override."
           >
             ⚠ Auto-limited to {autoLimit.toLocaleString()} rows
+          </span>
+        )}
+        {reusedPreviousResult && (
+          <span
+            className="flex items-center gap-1 px-2 py-0.5 rounded text-xs"
+            style={{ background: 'rgba(34,197,94,0.1)', color: '#16a34a', border: '1px solid rgba(34,197,94,0.25)' }}
+            title="Athena returned cached results from a previous identical query — no data was scanned."
+          >
+            ♻ Results from cache
           </span>
         )}
         <div className="ml-auto flex items-center gap-2">
