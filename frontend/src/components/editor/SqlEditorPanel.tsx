@@ -242,6 +242,7 @@ export function SqlEditorPanel({ tabId }: Props) {
       if (title) setName(data.query_execution_id, title)
       const comment = extractSqlComment(stmt)
       if (comment) setDescription(data.query_execution_id, comment)
+      queryClient.invalidateQueries({ queryKey: ['queryHistory'] })
       const poll = async () => {
         const detail = await api.getQuery(data.query_execution_id)
         const state = detail.status.state
@@ -254,8 +255,8 @@ export function SqlEditorPanel({ tabId }: Props) {
             queryError: state === 'FAILED' ? (detail.status.state_change_reason ?? 'Query failed') : undefined,
             reusedPreviousResult: state === 'SUCCEEDED' ? (detail.reused_previous_result ?? false) : false,
           })
+          queryClient.invalidateQueries({ queryKey: ['queryHistory'] })
           if (state === 'SUCCEEDED') {
-            queryClient.invalidateQueries({ queryKey: ['queryHistory'] })
             queryClient.invalidateQueries({ queryKey: ['tables'] })
             queryClient.invalidateQueries({ queryKey: ['table'] })
             queryClient.invalidateQueries({ queryKey: ['queryResults', data.query_execution_id] })
@@ -469,6 +470,7 @@ export function SqlEditorPanel({ tabId }: Props) {
         : { id: `err-${i}`, state: 'FAILED', error: 'Failed to submit' }
     )
     useEditorStore.getState().updateTab(tabId, { queryExecutions: initialExecs })
+    queryClient.invalidateQueries({ queryKey: ['queryHistory'] })
 
     const checkAllDone = () => {
       const t = useEditorStore.getState().tabs.find(x => x.id === tabId)
