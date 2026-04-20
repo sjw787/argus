@@ -595,7 +595,8 @@ export function SqlEditorPanel({ tabId }: Props) {
       poll()
     } catch (err) {
       setIsExplaining(false)
-      const msg = err instanceof Error ? err.message : String(err)
+      const axiosDetail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      const msg = axiosDetail ?? (err instanceof Error ? err.message : String(err))
       openPlanTab(`-- EXPLAIN ${planType} submission failed\n-- ${msg}`, 'Plan error')
     }
   }, [tab?.database, tab?.sql])

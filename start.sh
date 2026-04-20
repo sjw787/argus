@@ -112,7 +112,7 @@ elif [[ "$MODE" == "dev" ]]; then
   echo ""
 
   # Start FastAPI with reload
-  python -m uvicorn "argus.api.app:create_app" \
+  ARGUS_VERBOSE_ERRORS=true python -m uvicorn "argus.api.app:create_app" \
     --factory \
     --host 127.0.0.1 \
     --port 8000 \
