@@ -210,6 +210,7 @@ class WorkgroupCreate(BaseModel):
 class WorkgroupUpdate(BaseModel):
     description: Optional[str] = None
     output_location: Optional[str] = None
+    engine_version: Optional[str] = None
     state: Optional[str] = None
 
 

@@ -20,6 +20,7 @@ interface Props {
   /** Index of this result within a multi-query tab (0-based). Used to target
    *  the correct statement when injecting WHERE conditions. */
   queryIndex?: number
+  disableSorting?: boolean
 }
 
 interface CellMenu {
@@ -30,7 +31,7 @@ interface CellMenu {
   colType?: string
 }
 
-export function ResultsGrid({ queryExecutionId, queryState, queryError, limitApplied, reusedPreviousResult, autoLimit, onCancel, tabId, queryIndex }: Props) {
+export function ResultsGrid({ queryExecutionId, queryState, queryError, limitApplied, reusedPreviousResult, autoLimit, onCancel, tabId, queryIndex, disableSorting }: Props) {
   const [isExporting, setIsExporting] = useState(false)
   const [cellMenu, setCellMenu] = useState<CellMenu | null>(null)
   const gridApiRef = useRef<GridApi | null>(null)
@@ -181,7 +182,7 @@ export function ResultsGrid({ queryExecutionId, queryState, queryError, limitApp
     headerName: col.name,
     field: col.name,
     resizable: true,
-    sortable: true,
+    sortable: !disableSorting,
     filter: true,
     minWidth: 80,
     flex: 1,

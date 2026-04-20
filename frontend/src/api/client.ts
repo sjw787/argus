@@ -337,6 +337,9 @@ export const api = {
   createWorkgroup: (data: { name: string; description?: string; output_location?: string; engine_version?: string }) =>
     apiClient.post<WorkgroupItem>('/workgroups', data).then(r => r.data),
 
+  updateWorkgroup: (name: string, data: { description?: string; output_location?: string; engine_version?: string; state?: string }) =>
+    apiClient.put<WorkgroupItem>(`/workgroups/${name}`, data).then(r => r.data),
+
   deleteWorkgroup: (name: string, recursive = false) =>
     apiClient.delete(`/workgroups/${name}`, { params: { recursive } }).then(r => r.data),
 

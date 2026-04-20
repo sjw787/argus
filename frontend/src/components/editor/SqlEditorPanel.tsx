@@ -273,6 +273,8 @@ export function SqlEditorPanel({ tabId }: Props) {
   const [explainPlanType, setExplainPlanType] = useState<ExplainPlanType>('LOGICAL')
   const [explainDropdownOpen, setExplainDropdownOpen] = useState(false)
   const [isExplaining, setIsExplaining] = useState(false)
+  const [explainUpgradeWorkgroup, setExplainUpgradeWorkgroup] = useState<string | null>(null)
+  const [isUpgradingEngine, setIsUpgradingEngine] = useState(false)
   const explainDropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -561,6 +563,7 @@ export function SqlEditorPanel({ tabId }: Props) {
     setExplainPlanType(planType)
     setExplainDropdownOpen(false)
     setIsExplaining(true)
+    setExplainUpgradeWorkgroup(null)
     const openPlanTab = (body: string, label: string) => {
       useEditorStore.getState().openTab({
         title: `${label} (${planType}): ${tab.database}`,
@@ -587,6 +590,7 @@ export function SqlEditorPanel({ tabId }: Props) {
             openPlanTab(planText || '(empty plan returned)', 'Plan')
           } else {
             const reason = detail.status.state_change_reason ?? `Query ${state}`
+            if (detail.workgroup) setExplainUpgradeWorkgroup(detail.workgroup)
             openPlanTab(`-- EXPLAIN ${planType} failed (${state})\n-- ${reason}`, 'Plan error')
           }
         } catch (err) {
@@ -735,6 +739,36 @@ export function SqlEditorPanel({ tabId }: Props) {
           )
         })()}
 
+        {/* Engine upgrade prompt — appears after an explain failure */}
+        {explainUpgradeWorkgroup && (
+          <button
+            onClick={async () => {
+              setIsUpgradingEngine(true)
+              try {
+                await api.updateWorkgroup(explainUpgradeWorkgroup, { engine_version: 'Athena engine version 3' })
+                setExplainUpgradeWorkgroup(null)
+              } catch {
+                // leave the button visible so the user can retry
+              } finally {
+                setIsUpgradingEngine(false)
+              }
+            }}
+            disabled={isUpgradingEngine}
+            className="flex items-center gap-1.5 px-2.5 py-1 text-xs rounded"
+            style={{
+              background: 'rgba(234,179,8,0.12)',
+              color: '#ca8a04',
+              border: '1px solid rgba(234,179,8,0.35)',
+              cursor: isUpgradingEngine ? 'wait' : 'pointer',
+              opacity: isUpgradingEngine ? 0.6 : 1,
+            }}
+            title={`Upgrade workgroup "${explainUpgradeWorkgroup}" from engine v2 to Athena engine version 3 to enable EXPLAIN`}
+          >
+            {isUpgradingEngine ? <Loader size={11} className="animate-spin" /> : <span>⚡</span>}
+            Upgrade {explainUpgradeWorkgroup} to engine v3
+          </button>
+        )}
+
         {/* State badge — aggregate for multi-query */}
         {tab.queryExecutions ? (() => {
           const execs = tab.queryExecutions
@@ -843,6 +877,7 @@ export function SqlEditorPanel({ tabId }: Props) {
                     tabId={tabId}
                     queryIndex={tab.activeResultIdx ?? 0}
                     onCancel={(exec.state === 'RUNNING' || exec.state === 'QUEUED') ? () => handleCancel(exec.id) : undefined}
+                    disableSorting={tab.type === 'plan'}
                   />
                 }
                 return (
@@ -862,6 +897,7 @@ export function SqlEditorPanel({ tabId }: Props) {
               autoLimit={autoLimit}
               tabId={tabId}
               onCancel={(tab.queryState === 'RUNNING' || tab.queryState === 'QUEUED') && tab.queryExecutionId ? () => handleCancel(tab.queryExecutionId!) : undefined}
+              disableSorting={tab.type === 'plan'}
             />
           ) : tab.queryError ? (
             <div className="flex flex-col gap-2 p-4 h-full overflow-auto" style={{ background: 'var(--bg-panel)' }}>

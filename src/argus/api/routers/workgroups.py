@@ -169,6 +169,8 @@ def update_workgroup(
     config_updates = {}
     if body.output_location:
         config_updates["ResultConfigurationUpdates"] = {"OutputLocation": body.output_location}
+    if body.engine_version:
+        config_updates["EngineVersion"] = {"SelectedEngineVersion": body.engine_version}
     try:
         svc.update_work_group(name, description=body.description, configuration_updates=config_updates or None, state=body.state)
         resp = svc.get_work_group(name)
