@@ -45,7 +45,7 @@ export function BottomPanel({ onToggle }: { onToggle?: () => void }) {
     }
   }
 
-  const { data: history } = useQuery({
+  const { data: history, error: historyError } = useQuery({
     queryKey: ['queryHistory'],
     queryFn: () => api.listQueries(undefined, 50),
     refetchInterval: 5000,
@@ -154,7 +154,10 @@ export function BottomPanel({ onToggle }: { onToggle?: () => void }) {
         </button>
       </div>
       <div className="flex-1 overflow-auto scrollbar-thin">
-        {bottomTab === 'history' && <QueryHistoryList items={historyList} names={names} descriptions={descriptions} onOpen={handleOpenInEditor} loadingId={loadingId} />}
+        {bottomTab === 'history' && (historyError
+          ? <div className="p-3 text-xs" style={{ color: 'var(--error)' }}>Failed to load history: {(historyError as { message?: string }).message ?? String(historyError)}</div>
+          : <QueryHistoryList items={historyList} names={names} descriptions={descriptions} onOpen={handleOpenInEditor} loadingId={loadingId} />
+        )}
         {bottomTab === 'active' && (
           <ActiveQueriesPanel
             queries={localActive}

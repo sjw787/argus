@@ -355,8 +355,11 @@ def list_queries(
         if workgroup:
             workgroups_to_query = [workgroup]
         else:
-            # Collect all configured workgroups; fall back to 'primary'
-            configured = set(config.workgroups.output_locations.keys()) if config.workgroups.output_locations else set()
+            # Collect all known workgroups: from output_locations, from database→workgroup
+            # assignments, and always include 'primary' as the default fallback.
+            configured: set[str] = set()
+            configured.update(config.workgroups.output_locations.keys())
+            configured.update(config.workgroups.assignments.values())
             configured.add("primary")
             workgroups_to_query = list(configured)
 
