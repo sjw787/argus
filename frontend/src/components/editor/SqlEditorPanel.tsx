@@ -564,6 +564,7 @@ export function SqlEditorPanel({ tabId }: Props) {
         title: `${label} (${planType}): ${tab.database}`,
         sql: body,
         database: tab.database,
+        type: 'plan',
       })
     }
     try {
@@ -661,18 +662,21 @@ export function SqlEditorPanel({ tabId }: Props) {
         </button>
 
         {/* Explain button with plan type dropdown */}
+        {(() => {
+          const explainDisabled = !tab.database || !tab.sql.trim() || isExplaining || tab.type === 'er-diagram' || tab.type === 'plan'
+          return (
         <div ref={explainDropdownRef} style={{ position: 'relative' }}>
           <div className="flex" style={{ border: '1px solid var(--border)', borderRadius: 4, overflow: 'hidden' }}>
             <button
               onClick={() => handleExplain(explainPlanType)}
-              disabled={!tab.database || !tab.sql.trim() || isExplaining}
+              disabled={explainDisabled}
               className="flex items-center gap-1.5 px-2.5 py-1 text-xs"
               style={{
                 background: 'var(--bg-panel)',
                 color: 'var(--text-muted)',
                 border: 'none',
-                cursor: (!tab.database || !tab.sql.trim() || isExplaining) ? 'not-allowed' : 'pointer',
-                opacity: (!tab.database || !tab.sql.trim() || isExplaining) ? 0.4 : 1,
+                cursor: explainDisabled ? 'not-allowed' : 'pointer',
+                opacity: explainDisabled ? 0.4 : 1,
               }}
               title={`Explain query (${explainPlanType})`}
             >
@@ -681,14 +685,14 @@ export function SqlEditorPanel({ tabId }: Props) {
             </button>
             <button
               onClick={() => setExplainDropdownOpen(o => !o)}
-              disabled={!tab.database || !tab.sql.trim() || isExplaining}
+              disabled={explainDisabled}
               className="flex items-center px-1 py-1 text-xs"
               style={{
                 background: 'var(--bg-panel)',
                 color: 'var(--text-muted)',
                 borderLeft: '1px solid var(--border)',
-                cursor: (!tab.database || !tab.sql.trim() || isExplaining) ? 'not-allowed' : 'pointer',
-                opacity: (!tab.database || !tab.sql.trim() || isExplaining) ? 0.4 : 1,
+                cursor: explainDisabled ? 'not-allowed' : 'pointer',
+                opacity: explainDisabled ? 0.4 : 1,
               }}
               title="Select explain type"
             >
@@ -726,6 +730,8 @@ export function SqlEditorPanel({ tabId }: Props) {
             </div>
           )}
         </div>
+          )
+        })()}
 
         {/* State badge — aggregate for multi-query */}
         {tab.queryExecutions ? (() => {
